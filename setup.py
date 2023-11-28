@@ -35,7 +35,8 @@ setup(
     name="axon-projection",
     author="cells",
     author_email="cells@groupes.epfl.ch",
-    description="A code that analyses long-range axons provided as input, and classify them based on the brain regions they project to.",
+    description="A code that analyses long-range axons provided as input, "
+    + "and classify them based on the brain regions they project to.",
     long_description=Path("README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
     url="https://bbpteam.epfl.ch/documentation/projects/axon-projection",
