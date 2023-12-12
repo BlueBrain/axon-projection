@@ -77,7 +77,7 @@ def compare_source_regions(config):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
-    config = configparser.ConfigParser()
-    config.read(sys.argv[1])
+    config_ = configparser.ConfigParser()
+    config_.read(sys.argv[1])
 
-    compare_source_regions(config)
+    compare_source_regions(config_)

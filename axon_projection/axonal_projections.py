@@ -140,7 +140,7 @@ def create_ap_table(
                 )
 
                 # add this terminal point's region to the region_names dict, with his ascendants
-                if term_pt_asc[0] not in region_names.keys():
+                if term_pt_asc[0] not in region_names:
                     region_names[term_pt_asc[0]] = [
                         region_map.get(
                             brain_regions.lookup(term_pt), "acronym", with_ascendants=True
@@ -150,7 +150,7 @@ def create_ap_table(
 
                 # get the acronym of the terminal pt's region at the desired brain region
                 # hierarchy level
-                if term_pt_asc[0] not in dict_acronyms_at_level.keys():
+                if term_pt_asc[0] not in dict_acronyms_at_level:
                     acronym_at_level = get_region_at_level(term_pt_asc, hierarchy_level)
                     dict_acronyms_at_level[term_pt_asc[0]] = acronym_at_level
                 # and store it in the list of targeted regions of this morph
@@ -204,7 +204,7 @@ def create_ap_table(
     check_df.to_csv(output_path + "ap_check_" + str(hierarchy_level) + ".csv")
 
     # this is just to check the names of the acronyms
-    with open(output_path + "region_names.csv", "w") as f:
+    with open(output_path + "region_names.csv", "w", encoding="utf-8") as f:
         for key, value in region_names.items():
             f.write("%s : %s\n" % (key, value))
 
@@ -231,7 +231,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.DEBUG)
 
-    config = configparser.ConfigParser()
-    config.read(sys.argv[1])
+    config_ = configparser.ConfigParser()
+    config_.read(sys.argv[1])
 
-    main(config)
+    main(config_)

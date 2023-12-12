@@ -13,7 +13,14 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 VERSION = module.VERSION
 
-reqs = ["click>=7"]
+reqs = [
+    "click>=7",
+    "networkx",
+    "numpy",
+    "kgforge",
+    "pandas",
+    "matplotlib",
+]
 
 doc_reqs = [
     "m2r2",

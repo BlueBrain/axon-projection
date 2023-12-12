@@ -74,5 +74,5 @@ if __name__ == "__main__":
     # TOKEN needs to be updated every once in a while, otherwise one can get an error such as :
     # requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url:
     # https://bbp.epfl.ch/nexus/v1/projects/bbp/atlas
-    TOKEN = ""
-    get_atlas_hierarchy(TOKEN)
+    TOKEN_ = ""
+    get_atlas_hierarchy(TOKEN_)

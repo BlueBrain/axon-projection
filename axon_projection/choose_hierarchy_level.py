@@ -24,7 +24,7 @@ def extract_acronyms_at_level(data, level):
             for child in node["children"]:
                 traverse_hierarchy(child, current_level + 1)
 
-    with open(data) as f:
+    with open(data, encoding="utf-8") as f:
         hierarchy_data = json.load(f)
 
     if "msg" in hierarchy_data and len(hierarchy_data["msg"]) > 0:
@@ -66,5 +66,5 @@ def get_region_at_level(list_asc, level):
 
 
 if __name__ == "__main__":
-    list = ["CP", "STRd", "STR", "CNU", "CH", "grey", "root"]
-    print(get_region_at_level(list, 7))  # prints 'CP', which is at hierarchy 6
+    list_ = ["CP", "STRd", "STR", "CNU", "CH", "grey", "root"]
+    print(get_region_at_level(list_, 7))  # prints 'CP', which is at hierarchy 6

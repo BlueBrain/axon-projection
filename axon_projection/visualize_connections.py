@@ -27,6 +27,8 @@ def get_hierarchy_level(acronym, ascendants):
         if acronym == asc:
             return len(ascendants) - i
 
+    return 0
+
 
 def create_ascendance_table(region_map, regions):
     """Create a dict with ascendants of each region.
@@ -45,7 +47,7 @@ def create_ascendance_table(region_map, regions):
     """
     table = {}
     for region in regions:
-        if region not in table.keys():
+        if region not in table:
             table[region] = region_map.get(
                 region_map.find(region, "acronym").pop(), "acronym", with_ascendants=True
             )
@@ -89,6 +91,8 @@ def find_nodes_between(A, B, asc_table):
                 asc_B.reverse()
                 # return the list that contains the nodes path to go from A to B
                 return nodes_to_cross
+    # return an empty list if path not found
+    return nodes_to_cross
 
 
 def create_conn_graphs(config):
