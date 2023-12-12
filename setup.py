@@ -20,6 +20,9 @@ reqs = [
     "nexusforge",
     "pandas",
     "matplotlib",
+    "sklearn",
+    "neurom",
+    "voxcell",
 ]
 
 doc_reqs = [

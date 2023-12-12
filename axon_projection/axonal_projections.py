@@ -46,7 +46,7 @@ def create_ap_table(
     os.makedirs(output_path, exist_ok=True)
 
     # load the atlas and region_map to find brain regions based on coordinates.
-    atlas, brain_regions, region_map = load_atlas(atlas_path, atlas_regions, atlas_hierarchy)
+    _, brain_regions, region_map = load_atlas(atlas_path, atlas_regions, atlas_hierarchy)
 
     # list that will contain entries of the ap dataframe
     rows = []
@@ -83,11 +83,11 @@ def create_ap_table(
         # each sections of basal dendrites as source pos
         if source_pos is None or (isinstance(source_pos, list) and len(source_pos) == 0):
 
-            def filter(n):
+            def basal_dendrite_filter(n):
                 return n.type == nm.BASAL_DENDRITE  # or n.type == nm.APICAL_DENDRITE
 
             source_pos = np.mean(
-                [sec.points[0] for sec in iter_sections(morph, neurite_filter=filter)], axis=0
+                [sec.points[0] for sec in iter_sections(morph, neurite_filter=basal_dendrite_filter)], axis=0
             )[
                 0:3
             ]  # exclude radius if it is present
@@ -101,7 +101,7 @@ def create_ap_table(
             # select the source region at the desired hierarchy level
             source_region = get_region_at_level(source_asc, hierarchy_level)
         except Exception as e:
-            if repr(e).__contains__("Region ID not found") or repr(e).__contains__("Out"):
+            if "Region ID not found" in repr(e) or "Out" in repr(e):
                 num_bad_morphs += 1
                 logging.warning("Source region could not be found.")
             continue
@@ -109,13 +109,13 @@ def create_ap_table(
         axon = {"source": source_region}
 
         # find the targeted region by each terminal
-        def filter(n):
+        def axon_filter(n):
             return n.type == nm.AXON
 
         # first find the terminal points
         terminal_points = [
             sec.points.tolist()
-            for sec in iter_sections(morph, iterator_type=Section.ileaf, neurite_filter=filter)
+            for sec in iter_sections(morph, iterator_type=Section.ileaf, neurite_filter=axon_filter)
         ]
         # if no terminal points were found, it probably means that the morpho has no axon
         if len(terminal_points) == 0:
@@ -156,7 +156,7 @@ def create_ap_table(
                 # and store it in the list of targeted regions of this morph
                 terminals_regions.append(dict_acronyms_at_level[term_pt_asc[0]])
             except Exception as e:
-                if repr(e).__contains__("Region ID not found") or repr(e).__contains__("Out"):
+                if "Region ID not found" in repr(e) or "Out" in repr(e):
                     nb_oob_pts += 1
                 logging.debug(repr(e))
 

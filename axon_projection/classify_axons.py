@@ -102,7 +102,7 @@ def run_classification(config):
         f_as = f[f["source"] == s_a]
 
         logging.info("Shape of data %s", f_as.shape)
-        n_rows, n_cols = f_as.shape
+        n_rows, _ = f_as.shape
         # skip for now source regions that have less than five data points,
         # because the data is split in five during the grid_search for the best number of mixtures
         if n_rows < 5:
@@ -114,7 +114,7 @@ def run_classification(config):
         # we allow at most to have n_max_components classes
         n_max_components = int(n_rows / 2.0)
 
-        best_params, grid_search_res = find_best_gmm(
+        best_params, _ = find_best_gmm(
             data, n_max_components, seed=seed, n_jobs=n_jobs
         )
         # grid_search_res.to_markdown("grid_search_"+s_a+".md")
@@ -174,7 +174,7 @@ def run_classification(config):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
-    config = configparser.ConfigParser()
-    config.read(sys.argv[1])
+    config_ = configparser.ConfigParser()
+    config_.read(sys.argv[1])
 
-    run_classification(config)
+    run_classification(config_)
