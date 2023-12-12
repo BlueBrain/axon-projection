@@ -20,7 +20,7 @@ reqs = [
     "nexusforge",
     "pandas",
     "matplotlib",
-    "sklearn",
+    "scikit-learn",
     "neurom",
     "voxcell",
 ]
