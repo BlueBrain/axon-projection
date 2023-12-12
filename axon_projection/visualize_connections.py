@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
-from axonal_projections.query_atlas import load_atlas
+from axon_projection.query_atlas import load_atlas
 
 
 def get_hierarchy_level(acronym, ascendants):
