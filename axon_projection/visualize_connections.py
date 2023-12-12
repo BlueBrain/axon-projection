@@ -27,7 +27,7 @@ def get_hierarchy_level(acronym, ascendants):
     for i, asc in enumerate(ascendants):
         if acronym == asc:
             return len(ascendants) - i
-
+    # return root if acronym is not in the ascendants
     return 0
 
 
