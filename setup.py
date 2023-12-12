@@ -17,7 +17,7 @@ reqs = [
     "click>=7",
     "networkx",
     "numpy",
-    "kgforge",
+    "nexusforge",
     "pandas",
     "matplotlib",
 ]
