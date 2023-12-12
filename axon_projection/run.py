@@ -5,10 +5,10 @@ import logging
 import sys
 import time
 
-from axonal_projections import main as create_ap_table
-from check_atlas import compare_source_regions
-from classify_axons import run_classification as classify_axons
-from visualize_connections import create_conn_graphs
+from axon_projection.axonal_projections import main as create_ap_table
+from axon_projection.check_atlas import compare_source_regions
+from axon_projection.classify_axons import run_classification as classify_axons
+from axon_projection.visualize_connections import create_conn_graphs
 
 if __name__ == "__main__":
     start_time = time.time()
