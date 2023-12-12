@@ -87,7 +87,11 @@ def create_ap_table(
                 return n.type == nm.BASAL_DENDRITE  # or n.type == nm.APICAL_DENDRITE
 
             source_pos = np.mean(
-                [sec.points[0] for sec in iter_sections(morph, neurite_filter=basal_dendrite_filter)], axis=0
+                [
+                    sec.points[0]
+                    for sec in iter_sections(morph, neurite_filter=basal_dendrite_filter)
+                ],
+                axis=0,
             )[
                 0:3
             ]  # exclude radius if it is present

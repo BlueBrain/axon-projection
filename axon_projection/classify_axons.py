@@ -114,9 +114,7 @@ def run_classification(config):
         # we allow at most to have n_max_components classes
         n_max_components = int(n_rows / 2.0)
 
-        best_params, _ = find_best_gmm(
-            data, n_max_components, seed=seed, n_jobs=n_jobs
-        )
+        best_params, _ = find_best_gmm(data, n_max_components, seed=seed, n_jobs=n_jobs)
         # grid_search_res.to_markdown("grid_search_"+s_a+".md")
         logging.info(best_params)
         n_components = best_params["n_components"]
