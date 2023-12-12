@@ -9,10 +9,11 @@ from collections import Counter
 import neurom as nm
 import numpy as np
 import pandas as pd
-from choose_hierarchy_level import get_region_at_level
 from neurom.core.morphology import Section
 from neurom.core.morphology import iter_sections
-from query_atlas import load_atlas
+
+from axon_projection.choose_hierarchy_level import get_region_at_level
+from axon_projection.query_atlas import load_atlas
 
 
 def create_ap_table(
@@ -72,7 +73,7 @@ def create_ap_table(
         # load morpho
         try:
             morph = nm.load_morphology(morph_file)  # , use_subtrees=True)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             # skip this morph if it could not be loaded
             num_bad_morphs += 1
             logging.debug(repr(e))
@@ -104,7 +105,7 @@ def create_ap_table(
             )
             # select the source region at the desired hierarchy level
             source_region = get_region_at_level(source_asc, hierarchy_level)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             if "Region ID not found" in repr(e) or "Out" in repr(e):
                 num_bad_morphs += 1
                 logging.warning("Source region could not be found.")
@@ -159,7 +160,7 @@ def create_ap_table(
                     dict_acronyms_at_level[term_pt_asc[0]] = acronym_at_level
                 # and store it in the list of targeted regions of this morph
                 terminals_regions.append(dict_acronyms_at_level[term_pt_asc[0]])
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 if "Region ID not found" in repr(e) or "Out" in repr(e):
                     nb_oob_pts += 1
                 logging.debug(repr(e))
@@ -210,7 +211,7 @@ def create_ap_table(
     # this is just to check the names of the acronyms
     with open(output_path + "region_names.csv", "w", encoding="utf-8") as f:
         for key, value in region_names.items():
-            f.write("%s : %s\n" % (key, value))
+            f.write(f"{key} : {value}\n")
 
 
 def main(config):

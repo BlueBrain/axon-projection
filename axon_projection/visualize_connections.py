@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
-from query_atlas import load_atlas
+from axonal_projections.query_atlas import load_atlas
 
 
 def get_hierarchy_level(acronym, ascendants):
@@ -119,7 +119,7 @@ def create_conn_graphs(config):
     atlas_path = config["atlas"]["path"]
     atlas_regions = config["atlas"]["regions"]
     atlas_hierarchy = config["atlas"]["hierarchy"]
-    atlas, brain_regions, region_map = load_atlas(atlas_path, atlas_regions, atlas_hierarchy)
+    _, _, region_map = load_atlas(atlas_path, atlas_regions, atlas_hierarchy)
 
     # below this probability, we don't plot the connection
     min_prob = float(config["connectivity"]["min_prob"])
@@ -167,9 +167,9 @@ def create_conn_graphs(config):
                             inter_nodes[n + 1],
                             weight=min_prob + 0.001 + row["probability"],
                         )
-                        edge_labels[inter_nodes[n], inter_nodes[n + 1]] = "{:.2f}".format(
-                            100 * row["probability"]
-                        )
+                        edge_labels[
+                            inter_nodes[n], inter_nodes[n + 1]
+                        ] = f"{100 * row['probability']:.2f}"
                         # edge_weights.append(min_prob+0.001+2.*row['probability'])
                     else:
                         G.add_edge(inter_nodes[n], inter_nodes[n + 1], weight=min_prob + 0.001)
@@ -238,7 +238,7 @@ def create_conn_graphs(config):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
-    config = configparser.ConfigParser()
-    config.read(sys.argv[1])
+    config_ = configparser.ConfigParser()
+    config_.read(sys.argv[1])
 
-    create_conn_graphs(config)
+    create_conn_graphs(config_)

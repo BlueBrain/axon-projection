@@ -49,7 +49,8 @@ def get_atlas_hierarchy(TOKEN):
 
     atlas_release = forge.retrieve(atlas_release_id)
     # Get the current revision of the Atlas release
-    atlas_release._store_metadata["_rev"]
+    # not sure if this statement is pointless, took it from nexus forge
+    atlas_release._store_metadata["_rev"]  # pylint: disable=pointless-statement,protected-access
 
     parcellation_ontology = forge.retrieve(atlas_release.parcellationOntology.id, cross_bucket=True)
 
