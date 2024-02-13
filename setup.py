@@ -23,10 +23,10 @@ reqs = [
     "pandas>=1.5.3",
     "scikit-learn>=1.3.0",
     "voxcell>=3.1.5",
-    "plotly",
-    "plotly-helper",
+    "plotly>=5.17.0",
+    "plotly-helper>=0.0.8",
     "axon-synthesis",
-    "synthesis_workflow",
+    "synthesis_workflow>=1.0.2",
 ]
 
 doc_reqs = [
