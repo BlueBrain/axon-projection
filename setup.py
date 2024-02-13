@@ -15,18 +15,18 @@ VERSION = module.VERSION
 
 reqs = [
     "click>=7",
-    "matplotlib>=3.7.0",
+    "matplotlib",
     "networkx>=3.1",
     "neurom>=3.2.4",
     "nexusforge>=0.8.1",
-    "numpy>=1.24.0",
+    "numpy",
     "pandas>=1.5.3",
     "scikit-learn>=1.3.0",
     "voxcell>=3.1.5",
     "plotly>=5.17.0",
     "plotly-helper>=0.0.8",
-    "axon-synthesis",
-    "synthesis_workflow>=1.1.0",
+    "axon-synthesis>=0.1.0.dev0",
+    "synthesis_workflow>=1.0.2",
 ]
 
 doc_reqs = [
