@@ -21,6 +21,6 @@ def testing_dir(tmpdir, monkeypatch):
 
 
 @pytest.fixture
-def hierarchy_file_path(data_dir):
+def hierarchy_file_path(data_dir):  # pylint: disable=redefined-outer-name
     """Returns path to the hierarchy file from the testing framework."""
     return data_dir / "mba_hierarchy.json"
