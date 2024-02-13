@@ -62,9 +62,4 @@ def get_region_at_level(list_asc, level, hierarchy_file="mba_hierarchy.json"):
         if acr in acronyms_at_level:
             return acr
     # if none was found, repeat process with hierarchy level above the one specified
-    return get_region_at_level(list_asc, level - 1)
-
-
-if __name__ == "__main__":
-    list_ = ["CP", "STRd", "STR", "CNU", "CH", "grey", "root"]
-    print(get_region_at_level(list_, 7))  # prints 'CP', which is at hierarchy 6
+    return get_region_at_level(list_asc, level - 1, hierarchy_file)

@@ -1,0 +1,229 @@
+"""Functions to compute and compare the morphometrics of morphologies in the same class."""
+import configparser
+import logging
+import sys
+from multiprocessing import Process
+from multiprocessing import Queue
+
+import matplotlib.pyplot as plt
+import neurom as nm
+import numpy as np
+import pandas as pd
+from synthesis_workflow.validation import mvs_score
+
+
+def compute_stat(which_feature, pop, n_type, res_queue):
+    """Computes a NeuroM feature on the given population, and stores the result in a queue."""
+    val = np.array(nm.get(which_feature, pop, neurite_type=n_type))
+    res_queue.put({which_feature: val})
+
+
+def compute_stats(morphometrics, pop, neurite_type):
+    """Computes all morphometrics on the population, and returns the results as a dict."""
+    # get the results
+    res_dict = {}
+    # launch the processes
+    for stat in morphometrics:
+        val = np.array(nm.get(stat, pop, neurite_type=neurite_type))
+        res_dict.update({stat: val})
+
+    return res_dict
+
+
+def compute_stats_parallel(morphometrics, pop, neurite_type):
+    """Computes all morphometrics on the pop in parallel, and returns the results as a dict."""
+    processes_launched = []
+    res_queue = Queue()
+    # launch the processes
+    for stat in morphometrics:
+        processes_launched.append(
+            Process(target=compute_stat, args=(stat, pop, neurite_type, res_queue))
+        )
+        processes_launched[-1].start()
+
+    # get the results
+    res_dict = {}
+    num_processes = len(processes_launched)
+    for _ in range(num_processes):
+        res_dict.update(res_queue.get())
+
+    return res_dict
+
+
+# pylint: disable=too-many-arguments
+def compute_stats_cv(
+    morph_file,
+    list_other_morphs,
+    source,
+    cl,
+    morphometrics,
+    res_queue,
+    morphs_as_paths=True,
+    morph_index=-1,
+    in_parallel=True,
+):
+    """Compares the morphometrics of morph_file with the ones of the same-class morphs."""
+    # this dict will say how much this morpho is different from the others in its class
+    dict_rows = {}
+    # if morph_file and list_other_morphs are paths, load the morphos there
+    if morphs_as_paths:
+        # load the morpho
+        morph = nm.load_morphology(morph_file)
+        # load the remaining population
+        other_morphs = nm.load_morphologies(list_other_morphs)
+        dict_rows = {"morph_path": morph_file}
+    # otherwise, we can provide morphos directly (NeuroM or MorphIO)
+    else:
+        morph = morph_file
+        other_morphs = list_other_morphs
+    dict_rows.update({"source_region": source, "assigned_class": cl})
+    stats_morph = None
+    stats_other_morphs = None
+    if in_parallel:
+        # compute the morphometrics of this morpho
+        stats_morph = compute_stats_parallel(morphometrics, morph, nm.AXON)
+        # compute the morphometrics of all the other morphos in the class
+        stats_other_morphs = compute_stats_parallel(morphometrics, other_morphs, nm.AXON)
+    else:
+        stats_morph = compute_stats(morphometrics, morph, nm.AXON)
+        stats_other_morphs = compute_stats(morphometrics, other_morphs, nm.AXON)
+    # compute the also here the "representativity score" (the higher, the better) as
+    # len(morphometrics) - sum(MVS of morphometrics between this morph and the others)
+    rep_score = len(morphometrics)
+    # and compute the MVS between [single morpho] and [pop minus morpho] distributions
+    for stat in morphometrics:
+        # logging.debug("Computing %s...", stat)
+        # if comparing numbers (not distributions), mvs won't work, so compute the score manually
+        try:
+            mvs = mvs_score(stats_morph[stat], stats_other_morphs[stat])
+        except Exception as e:  # pylint: disable=broad-except
+            logging.debug("MVS could not be computed, computing it manually : [Error: %s]", repr(e))
+            mvs = min(
+                abs(np.mean(stats_morph[stat]) - np.mean(stats_other_morphs[stat]))
+                / np.mean(stats_morph[stat]),
+                1.0,
+            )
+        dict_rows.update({stat: mvs})
+        rep_score -= mvs
+    # normalize to get something between 0 and 1 (higher = more representative)
+    rep_score /= len(morphometrics)
+    dict_rows.update({"rep_score": rep_score})
+    if morph_index != -1:
+        dict_rows.update({"morph_id": morph_index})
+    res_queue.put(dict_rows)
+
+
+def cross_validate_class(df_same_class, source, cl, morphometrics):
+    """Compares the morphometrics of morphs in the same class, with a cross-validation strategy."""
+    processes_launched = []
+    res_queue = Queue()
+    # do a cross-validation
+    # pull out of the df each morpho one by one
+    for morph_file in df_same_class["morph_path"].values:
+        logging.debug("%s", morph_file)
+        df_tmp = df_same_class[df_same_class["morph_path"] != morph_file]
+        list_other_morphs = df_tmp["morph_path"].values.tolist()
+        processes_launched.append(
+            Process(
+                target=compute_stats_cv,
+                args=(morph_file, list_other_morphs, source, cl, morphometrics, res_queue),
+            )
+        )
+        processes_launched[-1].start()
+
+    # get the results of each process
+    res = []
+    num_processes = len(processes_launched)
+    for _ in range(num_processes):
+        res.append(res_queue.get())
+
+    return res
+
+
+def plot_morphometrics_difference(morphometrics, df_difference, out_path):
+    """Plots the discrepancies in df_difference for the given morphometrics."""
+    # plot the dataframe
+    plot = df_difference[morphometrics].plot.box(ylim=[0, 1])
+    plot.tick_params(axis="x", rotation=45)
+    plt.tight_layout()
+    plot.figure.savefig(out_path)
+
+
+def compare_morphometrics(config):
+    """Compares morphometrics of morphologies in the same class, with a cross-validation strategy.
+
+    This computation tests the assumption whether axons (tufts) in the same class have
+    similar morphometrics.
+    """
+    morphos_classes_df = pd.read_csv(config["output"]["path"] + "posteriors.csv")
+    sources = morphos_classes_df.source_region.unique()
+
+    # list of morphometrics features to compute
+    features_str = config["compare_morphometrics"]["features"]
+    morphometrics = [feature.strip() for feature in features_str.split(",")]
+
+    rows = []
+    # for each source region
+    for source in sources:
+        # for each morphos in the same class
+        df_same_source = morphos_classes_df[morphos_classes_df["source_region"] == source]
+        classes = df_same_source.class_assignment.unique()
+        for cl in classes:
+            df_same_class = df_same_source[df_same_source["class_assignment"] == cl]
+            # if there is only one point in that class, there is nothing to compare
+            if len(df_same_class) < 2:
+                continue
+            rows_class = cross_validate_class(df_same_class, source, cl, morphometrics)
+            rows += rows_class
+            df_class = pd.DataFrame(rows_class)
+            plot_morphometrics_difference(
+                morphometrics,
+                df_class,
+                config["output"]["path"]
+                + "MVS_"
+                + source.replace("/", "-")
+                + "_"
+                + str(cl)
+                + ".pdf",
+            )
+
+    df = pd.DataFrame(rows)
+    df.to_csv(config["output"]["path"] + "MVS_classes.csv")
+
+    plot_morphometrics_difference(
+        morphometrics, df, config["output"]["path"] + "MVS_all_classes.pdf"
+    )
+
+
+# TODO instead, assign random classification?
+def compare_morphometrics_all(config):
+    """Compares morphometrics of all morphologies, with a cross-validation strategy.
+
+    This function gives a standard from which we can compare if morphometrics from axons in the
+    same class are more similar than just the morphometrics of every other axon.
+    """
+    morphos_classes_df = pd.read_csv(config["output"]["path"] + "posteriors.csv")
+
+    # list of morphometrics features to compute
+    features_str = config["compare_morphometrics"]["features"]
+    morphometrics = [feature.strip() for feature in features_str.split(",")]
+
+    rows = []
+    rows += cross_validate_class(morphos_classes_df, "brain", "0", morphometrics)
+
+    df = pd.DataFrame(rows)
+    df.to_csv(config["output"]["path"] + "MVS_all_morphs_2.csv")
+
+    plot_morphometrics_difference(
+        morphometrics, df, config["output"]["path"] + "MVS_all_morphs_2.pdf"
+    )
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+
+    config_ = configparser.ConfigParser()
+    config_.read(sys.argv[1])
+
+    compare_morphometrics(config_)
+    # compare_morphometrics_all(config_)

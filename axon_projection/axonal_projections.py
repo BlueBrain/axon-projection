@@ -9,6 +9,7 @@ from collections import Counter
 import neurom as nm
 import numpy as np
 import pandas as pd
+from axon_synthesis.utils import get_axons
 from neurom.core.morphology import Section
 from neurom.core.morphology import iter_sections
 
@@ -16,6 +17,7 @@ from axon_projection.choose_hierarchy_level import get_region_at_level
 from axon_projection.query_atlas import load_atlas
 
 
+# pylint: disable=too-many-locals,too-many-statements,too-many-branches
 def create_ap_table(
     morph_dir, atlas_path, atlas_regions, atlas_hierarchy, hierarchy_level, output_path
 ):
@@ -55,6 +57,8 @@ def create_ap_table(
     # annotation. Also contains data about number of out of bound regions
     # found for each morphology.
     rows_check = []
+    # contains the entries for the dataframe for the tufts clustering
+    rows_terminals = []
     # get list of morphologies at morph_dir location
     list_morphs = nm.io.utils.get_morph_files(morph_dir)
     # contains the lookup table of acronyms of leaf region to desired hierarchy level
@@ -79,6 +83,7 @@ def create_ap_table(
             logging.debug(repr(e))
             continue
 
+        terminal_id = 0
         source_pos = morph.soma.center
         # if morph doesn't have a soma, take the average of the first points of
         # each sections of basal dendrites as source pos
@@ -111,17 +116,30 @@ def create_ap_table(
                 logging.warning("Source region could not be found.")
             continue
 
-        axon = {"source": source_region}
+        axon = {"morph_path": morph_file, "source": source_region}
 
         # find the targeted region by each terminal
-        def axon_filter(n):
-            return n.type == nm.AXON
+        # def axon_filter(n, id):
+        #     return n.type == nm.AXON and n.id == id
 
-        # first find the terminal points
-        terminal_points = [
-            sec.points.tolist()
-            for sec in iter_sections(morph, iterator_type=Section.ileaf, neurite_filter=axon_filter)
-        ]
+        axon_neurites = get_axons(morph)
+        res = []
+        for axon_id, axon_neurite in enumerate(axon_neurites):
+            # first find the terminal points
+            res += [
+                (sec.id, sec.points.tolist()[-1], axon_id)
+                for sec in axon_neurite.iter_sections(order=Section.ileaf)
+            ]
+        # get the list of sections ids and terminal points
+        try:
+            sections_id, terminal_points, axon_ids = zip(*res)
+        except Exception as e:  # pylint: disable=broad-except
+            num_bad_morphs += 1
+            logging.warning("No terminal points found. [Error: %s]", repr(e))
+            continue
+        sections_id = list(sections_id)
+        terminal_points = list(terminal_points)
+        axon_ids = list(axon_ids)
         # if no terminal points were found, it probably means that the morpho has no axon
         if len(terminal_points) == 0:
             num_morphs_wo_axon += 1
@@ -132,9 +150,6 @@ def create_ap_table(
 
         # find their corresponding brain regions
         terminals_regions = []
-        # for some reason, it didn't work to give the term_pts_list to the lookup,
-        # it still considered it as a unhashable ndarray
-        # so we iterate on each terminal point instead
         # counter of number of out of bound terminal points found
         nb_oob_pts = 0
         for term_pt in term_pts_list:
@@ -160,6 +175,21 @@ def create_ap_table(
                     dict_acronyms_at_level[term_pt_asc[0]] = acronym_at_level
                 # and store it in the list of targeted regions of this morph
                 terminals_regions.append(dict_acronyms_at_level[term_pt_asc[0]])
+                # finally, store this terminal for the tufts clustering
+                rows_terminals.append(
+                    {
+                        "morph_path": morph_file,
+                        "axon_id": axon_ids[terminal_id],
+                        "source": source_region,
+                        "target": dict_acronyms_at_level[term_pt_asc[0]],
+                        "terminal_id": terminal_id,
+                        "section_id": sections_id[terminal_id],
+                        "x": term_pt[0],
+                        "y": term_pt[1],
+                        "z": term_pt[2],
+                    }
+                )
+                terminal_id += 1
             except Exception as e:  # pylint: disable=broad-except
                 if "Region ID not found" in repr(e) or "Out" in repr(e):
                     nb_oob_pts += 1
@@ -184,6 +214,7 @@ def create_ap_table(
                 "name": morph_name_without_extension,
             }
         )
+    # end for morph
 
     if num_bad_morphs > 0:
         logging.info("Skipped %s morphologies that couldn't be loaded.", num_bad_morphs)
@@ -212,6 +243,10 @@ def create_ap_table(
     with open(output_path + "region_names.csv", "w", encoding="utf-8") as f:
         for key, value in region_names.items():
             f.write(f"{key} : {value}\n")
+
+    # terminals dataframe for the tufts clustering
+    term_df = pd.DataFrame(rows_terminals)
+    term_df.to_csv(output_path + "terminals.csv")
 
 
 def main(config):
