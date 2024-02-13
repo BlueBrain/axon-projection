@@ -26,7 +26,7 @@ reqs = [
     "plotly>=5.17.0",
     "plotly-helper>=0.0.8",
     "axon-synthesis",
-    "synthesis_workflow>=1.0.2",
+    "synthesis_workflow>=1.1.0",
 ]
 
 doc_reqs = [
