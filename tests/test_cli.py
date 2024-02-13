@@ -20,7 +20,7 @@ def test_cli(cli_runner):
 
 def test_entry_point(script_runner):
     """Test the entry point."""
-    ret = script_runner.run("axon-projection", "--version")
+    ret = script_runner.run(["axon-projection", "--version"])
     assert ret.success
     assert ret.stdout.startswith("axon-projection, version ")
     assert ret.stderr == ""
