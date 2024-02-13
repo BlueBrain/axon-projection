@@ -9,7 +9,7 @@ from collections import Counter
 import neurom as nm
 import numpy as np
 import pandas as pd
-from axon_synthesis.axon_synthesis.utils import get_axons
+from axon_synthesis.utils import get_axons
 from neurom.core.morphology import Section
 from neurom.core.morphology import iter_sections
 
