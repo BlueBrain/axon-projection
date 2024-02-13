@@ -21,6 +21,6 @@ def testing_dir(tmpdir, monkeypatch):
 
 
 @pytest.fixture
-def hierarchy_file_path(data_directory):
+def hierarchy_file_path(data_dir):
     """Returns path to the hierarchy file from the testing framework."""
-    return data_directory / "mba_hierarchy.json"
+    return data_dir / "mba_hierarchy.json"
