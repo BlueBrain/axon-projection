@@ -430,5 +430,5 @@ if __name__ == "__main__":
 
     config_ = configparser.ConfigParser()
     config_.read(sys.argv[1])
-    
+
     compute_tuft_properties(config_, plot_debug=False)
