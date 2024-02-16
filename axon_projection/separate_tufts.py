@@ -17,6 +17,8 @@ from axon_synthesis.utils import get_axons
 from axon_synthesis.utils import neurite_to_graph
 from morphio import IterType
 from neurom.core import Morphology
+from voxcell import OrientationField
+from voxcell.nexus.voxelbrain import Atlas
 
 from axon_projection.compute_morphometrics import compute_stats_cv
 from axon_projection.plot_utils import plot_tuft
@@ -155,8 +157,7 @@ def separate_tuft(
     # resize root section
     # Compute the tuft center
     tuft_center = np.mean(tuft_morph.points, axis=0)
-
-    # Compute tuft orientation
+    # Compute tuft orientation with respect to tuft common ancestor
     tuft_orientation = tuft_center[:-1] - tuft_ancestor.points[-1]
     tuft_orientation /= np.linalg.norm(tuft_orientation)
 
@@ -167,22 +168,67 @@ def separate_tuft(
     barcode = get_barcode(tuft_morph)
 
     # store barcode with tuft properties in dict
-    tuft.update({"barcode": barcode, "tuft_orientation": tuft_orientation})
-    # Export and plot the tuft
+    tuft.update(
+        {
+            "barcode": barcode,
+            "tuft_orientation": tuft_orientation,
+            "tuft_ancestor": tuft_ancestor.points[-1],
+        }
+    )
+    # Export the tuft
+    export_tuft_path = Path(out_path_tufts) / morph_name
+    export_tuft_morph_path = export_tuft_path / f"{target.replace('/','-')}.asc"
+    # write the tuft_morph file
+    tuft_morph.write(export_tuft_morph_path)
+    logging.debug("Written tuft %s to %s.", tuft, export_tuft_morph_path)
+    #  that will populate tufts dataframe
+    tuft.update({"tuft_morph": export_tuft_morph_path})
+    # plot the tuft
     if plot_debug:
-        export_tuft_path = Path(out_path_tufts) / morph_name
         export_tuft_fig_path = export_tuft_path / f"{target.replace('/','-')}.html"
-        export_tuft_morph_path = export_tuft_path / f"{target.replace('/','-')}.asc"
         plot_tuft(morph_file, tuft_morph, group, group_name, group, export_tuft_fig_path)
 
-        # write the tuft_morph file
-        tuft_morph.write(export_tuft_morph_path)
-        logging.debug("Written tuft %s to %s.", tuft, export_tuft_morph_path)
-        #  that will populate tufts dataframe
-        tuft.update({"tuft_morph": export_tuft_morph_path})
-
-    # return tuft
     res_queue.put(tuft)
+
+
+def compute_tufts_orientation(tufts_df, atlas_path):
+    """Compute the orientation of tufts based on the given dataframe and configuration.
+
+    Args:
+        tufts_df(pandas.DataFrame): The dataframe containing the tufts data.
+        atlas_path(str or Path): Path to the atlas (must contain an orientation field).
+
+    Returns:
+        pandas.DataFrame: The dataframe with the computed tufts orientation.
+    """
+    # load the atlas orientation field just once now, to compute tufts orientation
+    atlas = Atlas.open(atlas_path)
+    atlas_orientations = atlas.load_data("orientation", cls=OrientationField)
+
+    # we are forced to loop on tufts because voxcell doesn't allow to fill a value when OOB
+    for i, _ in enumerate(tufts_df.iterrows()):
+        try:
+            # retrieve orientation relative to ancestor
+            old_orientation = tufts_df["tuft_orientation"].to_numpy()[i]
+            # retrieve the ancestor
+            ancestor = tufts_df["tuft_ancestor"].to_numpy()[i]
+            # lookup the orientation of the ancestor w.r.t. the pia matter in the atlas
+            orientation = atlas_orientations.lookup(ancestor)[0].T
+            # finally, project the old orientation on the pia-oriented frame
+            # and overwrite the tuft_orientation in the tufts_df
+            tufts_df.at[i, "tuft_orientation"] = np.dot(old_orientation, orientation)
+        except Exception as e:  # pylint: disable=broad-except
+            logging.info(
+                "Tuft orientation could not be computed [%s]. "
+                "Falling back to computing orientation from tuft ancestor.",
+                repr(e),
+            )
+
+    # drop the unnamed column, which is a duplicate of the index
+    if tufts_df.columns.str.contains("^Unnamed").any():
+        tufts_df.drop(columns="Unnamed: 0", inplace=True)
+
+    return tufts_df
 
 
 def compute_rep_score(tufts_df, morphometrics):
@@ -283,16 +329,13 @@ def compute_tuft_properties(config, plot_debug=False):
     """Compute tuft properties and optionally plot them."""
     out_path = config["output"]["path"]
     morphos_path = config["morphologies"]["path"]
-    out_path_tufts = out_path + "tufts_par"
+    out_path_tufts = out_path + "tufts"
     os.makedirs(out_path_tufts, exist_ok=True)
 
     terminals_df = pd.read_csv(out_path + "terminals.csv")
     classes_df = pd.read_csv(out_path + "posteriors.csv")
-    output_cols = ["morph_file", "axon_id", "terminal_id", "x", "y", "z"]
     list_morphs = terminals_df.morph_path.unique()
     all_tufts = []
-    # res_queue = Queue()
-    # processes_launched = []
 
     # add the cluster_id column
     terminals_df["cluster_id"] = -1
@@ -302,20 +345,20 @@ def compute_tuft_properties(config, plot_debug=False):
         res_queue = manager.Queue()
 
         with Pool() as pool:
+            args_list = []
             # Isolate each tuft of a morphology
             for morph_file in list_morphs:
                 logging.info("Processing tufts of morph %s...", morph_file)
+                # load the morphology
                 morph = nm.load_morphology(morph_file)
                 morph_name = f"{Path(morph_file).with_suffix('').name.replace('/','-')}"
-
-                if plot_debug:
-                    os.makedirs(out_path_tufts + "/" + morph_name, exist_ok=True)
-
+                # create output dir for the tufts of this morph
+                os.makedirs(out_path_tufts + "/" + morph_name, exist_ok=True)
+                # select only the axon(s) of the morph
                 axons = get_axons(morph)
-
+                # filter the terminals of this morph only
                 terms_morph = terminals_df[terminals_df["morph_path"] == morph_file]
 
-                args_list = []
                 # for each target region of this morpho and for each axon
                 for (group_name, axon_id), group in terms_morph.groupby(["target", "axon_id"]):
                     # group is the df with terminals in current target
@@ -335,7 +378,6 @@ def compute_tuft_properties(config, plot_debug=False):
 
                     args = (
                         res_queue,
-                        config,
                         classes_df[classes_df["morph_path"] == morph_file]["class_assignment"].iloc[
                             0
                         ],
@@ -344,14 +386,14 @@ def compute_tuft_properties(config, plot_debug=False):
                         directed_graph,
                         group,
                         group_name,
-                        output_cols,
                         out_path_tufts,
                         plot_debug,
                     )
                     args_list.append(args)
 
-                # Launch separate_tuft function for each set of arguments in parallel
-                pool.starmap(separate_tuft, args_list)
+            logging.debug("Launching jobs for %s tufts...", len(args_list))
+            # Launch separate_tuft function for each set of arguments in parallel
+            pool.starmap(separate_tuft, args_list)
 
         # Retrieve results from the queue
         while not res_queue.empty():
@@ -359,9 +401,15 @@ def compute_tuft_properties(config, plot_debug=False):
 
     # build tufts dataframe
     tufts_df = pd.DataFrame(all_tufts)
-    # TODO get rid of that when it works
+    # # TODO get rid of that when it works
     # tufts_df.to_csv(out_path+"tufts_df.csv")
-    # tufts_df = pd.read_csv(out_path+"tufts_df.csv")
+    # tufts_df = pd.read_csv(
+    #     out_path + "tufts_df.csv",
+    #     converters={"tuft_orientation": pd.eval, "tuft_ancestor": pd.eval},
+    # )
+
+    # compute tufts orientation
+    tufts_df = compute_tufts_orientation(tufts_df, config["atlas"]["path"])
 
     # list of morphometrics features to compute
     features_str = config["compare_morphometrics"]["features"]
@@ -384,4 +432,4 @@ if __name__ == "__main__":
     config_.read(sys.argv[1])
     # TODO for now plot_debug should always be true
     # because we save the tufts also to compute the rep_score
-    compute_tuft_properties(config_, plot_debug=True)
+    compute_tuft_properties(config_, plot_debug=False)

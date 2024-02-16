@@ -116,7 +116,8 @@ def pick_tufts(axon_terminals, source, class_id, tufts_file, output_path=None):
     # store the picked tufts in a dataframe
     picked_tufts_df = pd.concat(picked_tufts)
     # remove the 'Unnamed' column
-    picked_tufts_df = picked_tufts_df.loc[:, ~picked_tufts_df.columns.str.contains("^Unnamed")]
+    if picked_tufts_df.columns.str.contains("^Unnamed"):
+        picked_tufts_df = picked_tufts_df.loc[:, ~picked_tufts_df.columns.str.contains("^Unnamed")]
     if output_path:
         picked_tufts_df.to_csv(output_path + "picked_tufts.csv")
 
