@@ -430,6 +430,5 @@ if __name__ == "__main__":
 
     config_ = configparser.ConfigParser()
     config_.read(sys.argv[1])
-    # TODO for now plot_debug should always be true
-    # because we save the tufts also to compute the rep_score
+    
     compute_tuft_properties(config_, plot_debug=False)
