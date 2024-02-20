@@ -5,6 +5,7 @@ import sys
 import time
 
 from axon_projection.axonal_projections import main as create_ap_table
+from axon_projection.check_atlas import compare_axonal_projections
 from axon_projection.check_atlas import compare_source_regions
 from axon_projection.classify_axons import run_classification as classify_axons
 from axon_projection.sample_axon import main as sample_axon
@@ -24,20 +25,23 @@ if __name__ == "__main__":
     create_ap_table(config)
 
     # check if morphologies are placed in the correct atlas
-    compare_source_regions(config)
+    if config["compare_source_regions"]["skip_comparison"] == "False":
+        compare_source_regions(config)
+    if config["compare_axonal_projections"]["skip_comparison"] == "False":
+        compare_axonal_projections(config)
 
     # classify the axons based on the projection table
     classify_axons(config)
 
     # create graphs to visualize the resulting connectivity
-    create_conn_graphs(config)
+    if config["connectivity"]["skip_visualization"] == "False":
+        create_conn_graphs(config)
 
     # compute tuft properties and give them a representativity score
-    compute_tuft_properties(config, plot_debug=True)
+    compute_tuft_properties(config)
 
     # sample an axon's tufts, given a source region
-    sample_source = "CA1"
-    picked_tufts_df = sample_axon(config, sample_source)
+    picked_tufts_df = sample_axon(config, config["sample_axon"]["source_region"])
 
     logging.info("Picked tufts : %s", picked_tufts_df)
 

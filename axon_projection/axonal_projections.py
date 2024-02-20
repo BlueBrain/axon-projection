@@ -17,6 +17,11 @@ from axon_projection.choose_hierarchy_level import get_region_at_level
 from axon_projection.query_atlas import load_atlas
 
 
+def basal_dendrite_filter(n):
+    """Checks if input neurite n is a basal dendrite."""
+    return n.type == nm.BASAL_DENDRITE
+
+
 # pylint: disable=too-many-locals,too-many-statements,too-many-branches
 def create_ap_table(
     morph_dir, atlas_path, atlas_regions, atlas_hierarchy, hierarchy_level, output_path
@@ -88,10 +93,6 @@ def create_ap_table(
         # if morph doesn't have a soma, take the average of the first points of
         # each sections of basal dendrites as source pos
         if source_pos is None or (isinstance(source_pos, list) and len(source_pos) == 0):
-
-            def basal_dendrite_filter(n):
-                return n.type == nm.BASAL_DENDRITE  # or n.type == nm.APICAL_DENDRITE
-
             source_pos = np.mean(
                 [
                     sec.points[0]
@@ -114,6 +115,7 @@ def create_ap_table(
             if "Region ID not found" in repr(e) or "Out" in repr(e):
                 num_bad_morphs += 1
                 logging.warning("Source region could not be found.")
+            logging.info("Skipping axon. [Error: %s]", repr(e))
             continue
 
         axon = {"morph_path": morph_file, "source": source_region}
@@ -203,7 +205,6 @@ def create_ap_table(
         rows.append(axon)
         # Get the base morph name from the path
         base_filename = os.path.basename(morph_file)
-
         # Remove the file extension
         morph_name_without_extension = os.path.splitext(base_filename)[0]
         rows_check.append(

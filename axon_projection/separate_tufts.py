@@ -7,6 +7,7 @@ from multiprocessing import Manager
 from multiprocessing import Pool
 from pathlib import Path
 
+import morphio
 import networkx as nx
 import neurom as nm
 import numpy as np
@@ -325,10 +326,11 @@ def compute_rep_score(tufts_df, morphometrics):
     return tufts_df
 
 
-def compute_tuft_properties(config, plot_debug=False):
+def compute_tuft_properties(config):
     """Compute tuft properties and optionally plot them."""
     out_path = config["output"]["path"]
     morphos_path = config["morphologies"]["path"]
+    plot_debug = config["separate_tufts"]["plot_debug"].lower() == "true"
     out_path_tufts = out_path + "tufts"
     os.makedirs(out_path_tufts, exist_ok=True)
 
@@ -339,6 +341,8 @@ def compute_tuft_properties(config, plot_debug=False):
 
     # add the cluster_id column
     terminals_df["cluster_id"] = -1
+
+    morphio.set_maximum_warnings(1)
 
     logging.debug("Found %s morphs from terminals file %s.", len(list_morphs), morphos_path)
     with Manager() as manager:
@@ -431,4 +435,4 @@ if __name__ == "__main__":
     config_ = configparser.ConfigParser()
     config_.read(sys.argv[1])
 
-    compute_tuft_properties(config_, plot_debug=False)
+    compute_tuft_properties(config_)

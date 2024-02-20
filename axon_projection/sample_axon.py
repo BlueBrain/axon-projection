@@ -24,7 +24,11 @@ def load_gmm(source_region, params_file):
     gmm.weights_ = gmm_df["probability"].values
     means = np.array([ast.literal_eval(item) for item in gmm_df["means"].values])
     gmm.means_ = means
-    variances = np.array([ast.literal_eval(item) for item in gmm_df["variances"].values])
+    try:
+        variances = np.array([ast.literal_eval(item) for item in gmm_df["variances"].values])
+    except Exception as e:  # pylint: disable=broad-except
+        logging.warning("[%s]", repr(e))
+        variances = np.array(gmm_df["variances"].values)
     gmm.covariances_ = variances
 
     return gmm
@@ -115,8 +119,8 @@ def pick_tufts(axon_terminals, source, class_id, tufts_file, output_path=None):
     logging.debug("Picked tufts : %s", picked_tufts)
     # store the picked tufts in a dataframe
     picked_tufts_df = pd.concat(picked_tufts)
-    # remove the 'Unnamed' column
-    if picked_tufts_df.columns.str.contains("^Unnamed"):
+    # remove the 'Unnamed' column if it exists
+    if "Unnamed: 0" in picked_tufts_df.columns:
         picked_tufts_df = picked_tufts_df.loc[:, ~picked_tufts_df.columns.str.contains("^Unnamed")]
     if output_path:
         picked_tufts_df.to_csv(output_path + "picked_tufts.csv")
@@ -154,4 +158,4 @@ if __name__ == "__main__":
     config_ = configparser.ConfigParser()
     config_.read(sys.argv[1])
 
-    main(config_, "CA1")
+    main(config_, config_["sample_axon"]["source_region"])

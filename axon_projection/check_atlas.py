@@ -8,6 +8,58 @@ import pandas as pd
 from voxcell import RegionMap
 
 
+def compare_axonal_projections(config):
+    """Compares the axonal projections in 'path_1' and 'path_2'."""
+    # Read the input data from the specified paths
+    df_1 = pd.read_csv(config["compare_axonal_projections"]["path_1"])
+    df_2 = pd.read_csv(config["compare_axonal_projections"]["path_2"])
+    # remove all the '_O' suffixes from the columns headers
+    df_1.columns = df_1.columns.str.replace("_O", "")
+    df_2.columns = df_2.columns.str.replace("_O", "")
+
+    # first, compare the column headers of the two dfs
+    if not df_1.columns.equals(df_2.columns):
+        logging.warning("Column headers of the two dataframes are different.")
+        logging.warning("Column headers of df_1: %s", df_1.columns)
+        logging.warning("Column headers of df_2: %s", df_2.columns)
+        rows_diff = []
+        # if columns are not the same, compare rows one by one
+        for _, row in df_1.iterrows():
+            logging.debug("Morph %s, source %s", row["morph_path"], row["source"].replace("_O", ""))
+            numeric_values_df1 = row.apply(pd.to_numeric, errors="coerce")
+            numeric_values_df1 = numeric_values_df1[numeric_values_df1 > 0]
+            logging.debug("DF 1 terminals: \n%s", numeric_values_df1)
+
+            row_df_2 = df_2[df_2["morph_path"] == row["morph_path"]]
+            dict_cmp = {"morph_path": row["morph_path"], "source": row["source"].replace("_O", "")}
+            num_diffs = 0
+            # if this morphology is not found in df2, put it entirely in the diff
+            if row_df_2.empty:
+                rows_diff.append(row)
+                continue
+            for col in row_df_2.columns:
+                if pd.to_numeric(row_df_2[col].iloc[0], errors="coerce") > 0:
+                    if col in row.index:
+                        diff = row_df_2[col].iloc[0] - row[col]
+                    else:
+                        diff = row_df_2[col].iloc[0]
+
+                    if diff != 0:
+                        dict_cmp.update({col: diff})
+                        num_diffs += 1
+            if num_diffs != 0:
+                rows_diff.append(dict_cmp)
+        diff_df = pd.DataFrame(rows_diff)
+        diff_df.to_csv(config["output"]["path"] + "compare_projections.csv", index=False)
+
+    else:
+        # Use the compare method to find differences
+        differences = df_1.compare(df_2)
+
+        # Save the differences
+        logging.info("Mismatches: %s", differences)
+
+
 def compare_source_regions(config):
     """Checks source regions of morphologies detected from the atlas.
 
@@ -81,3 +133,5 @@ if __name__ == "__main__":
     config_.read(sys.argv[1])
 
     compare_source_regions(config_)
+    if config_["compare_axonal_projections"]["skip_comparison"] == "False":
+        compare_axonal_projections(config_)
