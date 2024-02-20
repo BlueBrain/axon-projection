@@ -30,7 +30,7 @@ TODO: Replace this text by proper installation instructions.
 
 ## Examples
 
-The `example` folder contains the necessary data for running the workflow, *i.e.* a set of morphologies in `example/morphologies` and an atlas in `example/atlas_ccfv3_obp`. The `example/config_example.cfg` configuration file provides the parameters for each step of the workflow. The workflow can be run by executing the script `example/run_example.sh`, which basically places the user in the modules directory, and runs the complete workflow:
+The `example` folder contains some files to run an example of the code. The `example/config_example.cfg` configuration file provides the parameters for each step of the workflow. The workflow can be run by executing the script `example/run_example.sh`, which basically places the user in the modules directory, and runs the complete workflow:
 
     cd ../axon_projection
     python run.py ../example/config_example.cfg

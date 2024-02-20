@@ -27,7 +27,7 @@ def load_gmm(source_region, params_file):
     try:
         variances = np.array([ast.literal_eval(item) for item in gmm_df["variances"].values])
     except Exception as e:  # pylint: disable=broad-except
-        logging.warning("[%s]", repr(e))
+        logging.debug("[%s]", repr(e))
         variances = np.array(gmm_df["variances"].values)
     gmm.covariances_ = variances
 
