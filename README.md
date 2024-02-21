@@ -20,9 +20,13 @@ The output of this step, is the creation of classes for each source region, defi
     - the variances of these numbers of terminals;
 
   and the assignment to each class for every morphology in the dataset.
-- **visualize_connections.py** (optional): for each class, creates a graph of connectivity to other regions. Connectivity strengths are also shown, computed as $s = \frac{N_r}{N_T}$, with $N_r$ is the total number of terminals in the target region in the entire class, divided by $N_T$, the total number of terminals of all the axons in this class. ![Example graph.](./docs/graph_example.png)
+- **visualize_connections.py** (optional): for each class, creates a graph of connectivity to other regions. Connectivity strengths are also shown, computed as $s = \frac{N_r}{N_T}$, with $N_r$ is the total number of terminals in the target region in the entire class, divided by $N_T$, the total number of terminals of all the axons in this class. 
 
-    Orange nodes are for source region, purple for target regions, and blue for intermediary hierarchy to traverse (*i.e.*: DG-mo is in DG, which is in HIP, etc...).
+|<img src="./docs/graph_example.png" alt="Example graph" width="60%" height="auto">|
+|:---:|
+| *Orange nodes are for source region, purple for target regions, and blue for intermediary hierarchy to traverse (*i.e.*: DG-mo is in DG, which is in HIP, etc...).* |
+
+
 - **separate_tufts.py**: clusters and saves the tufts of each morphology by region, with their topological barcodes. Also computes how each tuft is representative of its class, by comparing the difference of the tuft with all the others tufts of its class, based on a set of morphometrics (defined in the configuration file). This representativity score ranges from 0 (not representative) to 1 (representative).
 - **sample_axon.py**: uses the previously defined GMMs to sample an axon from a specified source region. This draws a class assignment, and a number of terminals in each target region. Appropriate tufts are then selected, based on this number of terminals and the tufts' representativity score. The output is a tuft tuple, which, among others, contains the tuft topological barcode, which can be used for topological synthesis.
 
