@@ -20,7 +20,7 @@ The output of this step, is the creation of classes for each source region, defi
     - the variances of these numbers of terminals;
 
   and the assignment to each class for every morphology in the dataset.
-- **visualize_connections.py** (optional): for each class, creates a graph of connectivity to other regions. Connectivity strengths are also shown, computed as $s = \frac{N_r}{N_T}$, with $N_r$ is the total number of terminals in the target region in the entire class, divided by $N_T$, the total number of terminals of all the axons in this class. 
+- **visualize_connections.py** (optional): for each class, creates a graph of connectivity to other regions. Connectivity strengths are also shown, computed as $s = \frac{N_r}{N_T}$, with $N_r$ is the total number of terminals in the target region in the entire class, divided by $N_T$, the total number of terminals of all the axons in this class.
 
 |<p align="center"><img src="./docs/graph_example.png" alt="Example graph" width="60%" height="auto"></p>|
 |:---:|
