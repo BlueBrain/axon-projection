@@ -22,7 +22,7 @@ The output of this step, is the creation of classes for each source region, defi
   and the assignment to each class for every morphology in the dataset.
 - **visualize_connections.py** (optional): for each class, creates a graph of connectivity to other regions. Connectivity strengths are also shown, computed as $s = \frac{N_r}{N_T}$, with $N_r$ is the total number of terminals in the target region in the entire class, divided by $N_T$, the total number of terminals of all the axons in this class. 
 
-|<img src="./docs/graph_example.png" alt="Example graph" width="60%" height="auto">|
+|<p align="center"><img src="./docs/graph_example.png" alt="Example graph" width="60%" height="auto"></p>|
 |:---:|
 | *Orange nodes are for source region, purple for target regions, and blue for intermediary hierarchy to traverse (*i.e.*: DG-mo is in DG, which is in HIP, etc...).* |
 
