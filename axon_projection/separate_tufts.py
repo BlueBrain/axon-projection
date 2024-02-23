@@ -1,7 +1,9 @@
 """Functions to isolate the tufts in the target regions and create their barcodes."""
 import configparser
+import json
 import logging
 import os
+import pathlib
 import sys
 from multiprocessing import Manager
 from multiprocessing import Pool
@@ -66,6 +68,7 @@ def create_tuft_morphology(morph, tuft_nodes_ids, common_ancestor, common_path_,
 def separate_tuft(
     res_queue,
     class_assignment,
+    pop_id,
     n_terms,
     nodes,
     directed_graph,
@@ -78,6 +81,7 @@ def separate_tuft(
 
     Args:
         res_queue (Queue): The queue to put the resulting tuft into.
+        pop_id (str): The population_id for the morpho of the tuft.
         class_assignment (str): The class assignment for the morpho of the tuft.
         n_terms (int): The number of terminals in the tuft.
         nodes (DataFrame): The nodes of the graph of the morphology.
@@ -104,6 +108,7 @@ def separate_tuft(
     tuft = {
         "morph_path": morph_file,
         "source": source,
+        "population_id": pop_id,
         "class_assignment": class_assignment,
         "target": target,
         "n_terms": n_terms,
@@ -171,7 +176,7 @@ def separate_tuft(
     # store barcode with tuft properties in dict
     tuft.update(
         {
-            "barcode": barcode,
+            "barcode": np.array(barcode).tolist(),
             "tuft_orientation": tuft_orientation,
             "tuft_ancestor": tuft_ancestor.points[-1],
         }
@@ -183,7 +188,7 @@ def separate_tuft(
     tuft_morph.write(export_tuft_morph_path)
     logging.debug("Written tuft %s to %s.", tuft, export_tuft_morph_path)
     #  that will populate tufts dataframe
-    tuft.update({"tuft_morph": export_tuft_morph_path})
+    tuft.update({"tuft_morph": str(export_tuft_morph_path)})
     # plot the tuft
     if plot_debug:
         export_tuft_fig_path = export_tuft_path / f"{target.replace('/','-')}.html"
@@ -205,14 +210,16 @@ def compute_tufts_orientation(tufts_df, atlas_path):
     # load the atlas orientation field just once now, to compute tufts orientation
     atlas = Atlas.open(atlas_path)
     atlas_orientations = atlas.load_data("orientation", cls=OrientationField)
+    old_orientation_np = tufts_df["tuft_orientation"].to_numpy()
+    ancestor_np = tufts_df["tuft_ancestor"].to_numpy()
 
     # we are forced to loop on tufts because voxcell doesn't allow to fill a value when OOB
     for i, _ in enumerate(tufts_df.iterrows()):
         try:
             # retrieve orientation relative to ancestor
-            old_orientation = tufts_df["tuft_orientation"].to_numpy()[i]
+            old_orientation = old_orientation_np[i]
             # retrieve the ancestor
-            ancestor = tufts_df["tuft_ancestor"].to_numpy()[i]
+            ancestor = ancestor_np[i]
             # lookup the orientation of the ancestor w.r.t. the pia matter in the atlas
             orientation = atlas_orientations.lookup(ancestor)[0].T
             # finally, project the old orientation on the pia-oriented frame
@@ -224,6 +231,9 @@ def compute_tufts_orientation(tufts_df, atlas_path):
                 "Falling back to computing orientation from tuft ancestor.",
                 repr(e),
             )
+        # convert the tuft_orientation and tuft_ancestor to lists for json output later
+        tufts_df.at[i, "tuft_orientation"] = tufts_df.at[i, "tuft_orientation"].tolist()
+        tufts_df.at[i, "tuft_ancestor"] = tufts_df.at[i, "tuft_ancestor"].tolist()
 
     # drop the unnamed column, which is a duplicate of the index
     if tufts_df.columns.str.contains("^Unnamed").any():
@@ -385,6 +395,7 @@ def compute_tuft_properties(config):
                         classes_df[classes_df["morph_path"] == morph_file]["class_assignment"].iloc[
                             0
                         ],
+                        classes_df[classes_df["morph_path"] == morph_file]["population_id"].iloc[0],
                         n_terms,
                         nodes_df,
                         directed_graph,
@@ -405,12 +416,12 @@ def compute_tuft_properties(config):
 
     # build tufts dataframe
     tufts_df = pd.DataFrame(all_tufts)
-    # # TODO get rid of that when it works
+    # TODO get rid of that when everything works
     # tufts_df.to_csv(out_path+"tufts_df.csv")
-    # tufts_df = pd.read_csv(
-    #     out_path + "tufts_df.csv",
-    #     converters={"tuft_orientation": pd.eval, "tuft_ancestor": pd.eval},
-    # )
+    # # tufts_df = pd.read_csv(
+    # #     out_path + "tufts_df.csv",
+    # #     converters={"tuft_orientation": pd.eval, "tuft_ancestor": pd.eval},
+    # # )
 
     # compute tufts orientation
     tufts_df = compute_tufts_orientation(tufts_df, config["atlas"]["path"])
@@ -420,10 +431,16 @@ def compute_tuft_properties(config):
     morphometrics = [feature.strip() for feature in features_str.split(",")]
     # compute tufts representativity score, and update the df with it
     tufts_df = compute_rep_score(tufts_df, morphometrics)
-    # drop the tuft morphology objects, we don't need them from now on
-    # tufts_df.drop(columns="tuft_morph", inplace=True)
+    # # drop the tuft morphology objects, we don't need them from now on
+    # # tufts_df.drop(columns="tuft_morph", inplace=True)
     # and export it
-    tufts_df.to_csv(out_path + "tufts_df_rep_score.csv")
+    logging.info("Writing tufts dataframe to %s...", out_path + "tufts_df.csv")
+    tufts_df.to_csv(out_path + "tufts_df.csv")
+
+    # export tufts as json
+    logging.info("Writing tufts JSON to %s...", out_path + "tufts_properties.json")
+    with pathlib.Path(out_path + "tufts_properties.json").open(mode="w", encoding="utf-8") as f:
+        json.dump(tufts_df.to_dict("records"), f, indent=4)
 
     logging.info("Done classifying tufts.")
 

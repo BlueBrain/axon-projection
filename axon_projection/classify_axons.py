@@ -35,10 +35,12 @@ def find_best_gmm(data, n_components_max, seed=None, n_jobs=12):
         grid_search.best_params (dict) : parameters of the best GMM.
         res (pandas dataframe) : output of the search.
     """
+    # give the range of number of classes to try, and allowed variances types
     param_grid = {
         "n_components": range(1, n_components_max + 1),
         "covariance_type": ["spherical", "tied", "diag", "full"],
     }
+    # initialize the search parameters
     grid_search = GridSearchCV(
         GaussianMixture(random_state=seed),
         param_grid=param_grid,
@@ -46,11 +48,15 @@ def find_best_gmm(data, n_components_max, seed=None, n_jobs=12):
         verbose=0,
         n_jobs=n_jobs,
     )
+    # perform the search
     grid_search.fit(data)
+    # extract the results in a dataframe
     res = pd.DataFrame(grid_search.cv_results_)[
         ["param_n_components", "param_covariance_type", "mean_test_score"]
     ]
+    # make BIC score positive because GridSearchCV expects a score to *maximize*
     res["mean_test_score"] = -res["mean_test_score"]
+    # finally, rename the columns
     res = res.rename(
         columns={
             "param_n_components": "n_components",
@@ -62,14 +68,20 @@ def find_best_gmm(data, n_components_max, seed=None, n_jobs=12):
     return grid_search.best_params_, res
 
 
-def compute_posteriors(morphs_df, source, gmm):
+def compute_posteriors(morphs_df, source, gmm, source_region_id):
     """Computes probabilities for each morph to belong to each class, within a source region.
 
     (probabilities <=> "soft" clustering)
     """
-    class_assignment = gmm.predict(morphs_df.iloc[:, 3:].values)
-    probas = gmm.predict_proba(morphs_df.iloc[:, 3:].values)
-    log_likelihood = gmm.score_samples(morphs_df.iloc[:, 3:].values)
+    # get the feature vector for each morph
+    feature_vectors = morphs_df.iloc[:, 3:].values
+    # predict "softly" the class for each point by giving a probability to belong to each class
+    class_assignment = gmm.predict(feature_vectors)
+    # get the probability to belong to each class
+    probas = gmm.predict_proba(feature_vectors)
+    log_likelihood = gmm.score_samples(feature_vectors)
+    # build the list of population ids, one per morph
+    pop_ids_list = [str(source_region_id) + "_" + str(x) for x in class_assignment]
 
     # create DataFrame for morphologies, probabilities, and source region
     df_post = pd.DataFrame(
@@ -78,6 +90,7 @@ def compute_posteriors(morphs_df, source, gmm):
             "source_region": source,  # this value will be repeated for all rows,
             "probabilities": probas.tolist(),  # convert probabilities to list
             "class_assignment": class_assignment,  # the class ID assigned to this morpho
+            "population_id": pop_ids_list,  # the pop_id of this morpho
             "log_likelihood": log_likelihood.tolist(),  # prob to get each point, knowing the gmm
         }
     )
@@ -103,18 +116,21 @@ def run_classification(config):
         + config["morphologies"]["hierarchy_level"]
         + ".csv"
     )
-    # load data containing source region ("source") and number of terminals
+    # load feature data containing source region ("source") and number of terminals
     # in each target region ("<region_acronym>")
     f = pd.read_csv(data_path)
     # first three columns are row_id, morph_path and source region, the rest is target regions
-    target_regions_names = f.columns[3:]
+    target_region_acronyms = f.columns[3:]
     # for reproducibility
     seed = int(config["random"]["seed"])
     # this might not be needed at the moment
     np.random.seed = seed
     sources = f.source.unique()  # array of all source regions found in data
     clustering_output = []
+
     connexion_prob = []
+    # df containing region names and acronyms, so we don't have to reload the atlas
+    region_names_df = pd.read_csv(config["output"]["path"] + "region_names_df.csv", index_col=0)
     n_jobs = int(config["classify"]["n_jobs"])
     # dataframe that will contain the (posterior) probs to belong to each class for every morph
     df_post = pd.DataFrame(
@@ -124,6 +140,7 @@ def run_classification(config):
             "source_region",
             "probabilities",
             "class_assignment",
+            "population_id",
             "log_likelihood",
         ],
     )
@@ -150,6 +167,8 @@ def run_classification(config):
                             "probabilities": [1] * n_rows,  # convert probabilities to list
                             "class_assignment": [0]
                             * n_rows,  # the class ID assigned a posteriori to this morpho
+                            "population_id": [str(region_names_df.at[s_a, "id"]) + "_0"]
+                            * n_rows,  # the population_id of the morpho
                             "log_likelihood": [0]
                             * n_rows,  # the prob to observe each point knowing the gmm
                         }
@@ -166,6 +185,7 @@ def run_classification(config):
         best_params, _ = find_best_gmm(data, n_max_components, seed=seed, n_jobs=n_jobs)
         # grid_search_res.to_markdown("grid_search_"+s_a+".md")
         logging.info(best_params)
+        # TODO choose number of components and cov_type stochastically?
         n_components = best_params["n_components"]
         cov_type = best_params["covariance_type"]
 
@@ -183,7 +203,9 @@ def run_classification(config):
             clustering_output.append(
                 [
                     s_a,
+                    region_names_df.at[s_a, "id"],
                     c,
+                    str(region_names_df.at[s_a, "id"]) + "_" + str(c),
                     int(n_rows * gmm.weights_[c]),
                     gmm.weights_[c],
                     gmm.means_[c].tolist(),
@@ -196,17 +218,29 @@ def run_classification(config):
                 if gmm.means_[c][t] < 1e-16:
                     continue
                 connexion_prob.append(
-                    [s_a, c, target_regions_names[t], gmm.means_[c][t] / np.sum(gmm.means_[c])]
+                    [
+                        s_a,
+                        region_names_df.at[s_a, "id"],
+                        c,
+                        str(region_names_df.at[s_a, "id"]) + "_" + str(c),
+                        target_region_acronyms[t],
+                        region_names_df.at[target_region_acronyms[t], "id"],
+                        gmm.means_[c][t] / np.sum(gmm.means_[c]),
+                    ]
                 )
 
         # compute the probability to belong to each class for each morph
-        df_post = pd.concat([df_post, compute_posteriors(f_as, s_a, gmm)])
+        df_post = pd.concat(
+            [df_post, compute_posteriors(f_as, s_a, gmm, region_names_df.at[s_a, "id"])]
+        )
 
     df_out = pd.DataFrame(
         clustering_output,
         columns=[
             "source",
+            "brain_region_id",
             "class_id",
+            "population_id",
             "num_data_points",
             "probability",
             "means",
@@ -216,7 +250,16 @@ def run_classification(config):
     )
     df_out.to_csv(config["output"]["path"] + "clustering_output.csv")
     df_conn = pd.DataFrame(
-        connexion_prob, columns=["source", "class_id", "target_region", "probability"]
+        connexion_prob,
+        columns=[
+            "source",
+            "source_brain_region_id",
+            "class_id",
+            "source_population_id",
+            "target_region",
+            "target_brain_region_id",
+            "probability",
+        ],
     )
     df_conn.to_csv(config["output"]["path"] + "conn_probs.csv")
     df_post.to_csv(config["output"]["path"] + "posteriors.csv")

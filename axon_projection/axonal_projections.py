@@ -75,10 +75,11 @@ def create_ap_table(
     # counters for problematic morphologies
     num_morphs_wo_axon = 0
     num_bad_morphs = 0
-    logging.info("Found %s morphologies at %s", len(list_morphs), morph_dir)
+    num_total_morphs = len(list_morphs)
+    logging.info("Found %s morphologies at %s", num_total_morphs, morph_dir)
     # Register each morpho in directory one by one
-    for morph_file in list_morphs:
-        logging.info("Processing %s ", morph_file)
+    for i, morph_file in enumerate(list_morphs):
+        logging.info("Processing %s, progress : %s %% ", morph_file, 100.0 * i / num_total_morphs)
         # load morpho
         try:
             morph = nm.load_morphology(morph_file)  # , use_subtrees=True)
@@ -109,8 +110,14 @@ def create_ap_table(
             source_asc = region_map.get(
                 brain_regions.lookup(source_pos), "acronym", with_ascendants=True
             )
+            source_names = region_map.get(
+                brain_regions.lookup(source_pos), "name", with_ascendants=True
+            )
             # select the source region at the desired hierarchy level
             source_region = get_region_at_level(source_asc, hierarchy_level)
+            source_region_id = region_map.find(source_region, "acronym").pop()
+            if source_region not in region_names:
+                region_names[source_region] = [source_region_id, source_asc, source_names]
         except Exception as e:  # pylint: disable=broad-except
             if "Region ID not found" in repr(e) or "Out" in repr(e):
                 num_bad_morphs += 1
@@ -157,21 +164,11 @@ def create_ap_table(
         for term_pt in term_pts_list:
             # get the region for each terminal
             try:
-                term_pt_asc = region_map.get(
-                    brain_regions.lookup(term_pt), "acronym", with_ascendants=True
-                )
-
-                # add this terminal point's region to the region_names dict, with his ascendants
-                if term_pt_asc[0] not in region_names:
-                    region_names[term_pt_asc[0]] = [
-                        region_map.get(
-                            brain_regions.lookup(term_pt), "acronym", with_ascendants=True
-                        ),
-                        region_map.get(brain_regions.lookup(term_pt), "name", with_ascendants=True),
-                    ]
+                brain_reg_voxels = brain_regions.lookup(term_pt)
+                term_pt_asc = region_map.get(brain_reg_voxels, "acronym", with_ascendants=True)
 
                 # get the acronym of the terminal pt's region at the desired brain region
-                # hierarchy level
+                # hierarchy level, to not recompute that every time
                 if term_pt_asc[0] not in dict_acronyms_at_level:
                     acronym_at_level = get_region_at_level(term_pt_asc, hierarchy_level)
                     dict_acronyms_at_level[term_pt_asc[0]] = acronym_at_level
@@ -191,6 +188,14 @@ def create_ap_table(
                         "z": term_pt[2],
                     }
                 )
+
+                # add this terminal point's region to the region_names dict, with his ascendants
+                if acronym_at_level not in region_names:
+                    region_names[acronym_at_level] = [
+                        region_map.get(brain_reg_voxels, "id", with_ascendants=False),
+                        region_map.get(brain_reg_voxels, "acronym", with_ascendants=True),
+                        region_map.get(brain_reg_voxels, "name", with_ascendants=True),
+                    ]
                 terminal_id += 1
             except Exception as e:  # pylint: disable=broad-except
                 if "Region ID not found" in repr(e) or "Out" in repr(e):
@@ -225,7 +230,7 @@ def create_ap_table(
         )
     logging.info(
         "Extracted projection pattern from %s axons.",
-        len(list_morphs) - num_bad_morphs - num_morphs_wo_axon,
+        num_total_morphs - num_bad_morphs - num_morphs_wo_axon,
     )
     # df that will contain the classification data,
     # i.e. pairs of s_a, [t_a]
@@ -241,9 +246,10 @@ def create_ap_table(
     check_df.to_csv(output_path + "ap_check_" + str(hierarchy_level) + ".csv")
 
     # this is just to check the names of the acronyms
-    with open(output_path + "region_names.csv", "w", encoding="utf-8") as f:
-        for key, value in region_names.items():
-            f.write(f"{key} : {value}\n")
+    region_names_df = pd.DataFrame.from_dict(
+        region_names, orient="index", columns=["id", "acronyms", "names"]
+    )
+    region_names_df.to_csv(output_path + "region_names_df.csv")
 
     # terminals dataframe for the tufts clustering
     term_df = pd.DataFrame(rows_terminals)

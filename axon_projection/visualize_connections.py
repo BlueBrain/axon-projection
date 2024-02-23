@@ -114,8 +114,6 @@ def create_conn_graphs(config):
     os.makedirs(output_path, exist_ok=True)
 
     # file that contains the connection probabilities for each source region and each class
-    # conn_data_path = config["output"]["path"]+ "test_graph_conn.csv"#+
-    # config["morphologies"]["hierarchy_level"]+".csv"
     conn_data_path = config["output"]["path"] + "conn_probs.csv"
     atlas_path = config["atlas"]["path"]
     atlas_regions = config["atlas"]["regions"]
@@ -132,8 +130,6 @@ def create_conn_graphs(config):
     # create once the ascendance table for the sources and targets
     # needed to find the common ancestor
     asc_table = create_ascendance_table(region_map, sources + targets)
-
-    # change figure size to be able to see clearly the graph
 
     # for each source region
     for source in sources:
