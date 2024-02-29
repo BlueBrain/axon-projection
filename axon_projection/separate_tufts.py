@@ -16,20 +16,27 @@ import numpy as np
 import pandas as pd
 from axon_synthesis.PCSF.clustering.utils import common_path
 from axon_synthesis.PCSF.clustering.utils import get_barcode
-from axon_synthesis.utils import get_axons
 from axon_synthesis.utils import neurite_to_graph
-from morphio import IterType
-from neurom.core import Morphology
 from voxcell import OrientationField
 from voxcell.nexus.voxelbrain import Atlas
 
 from axon_projection.compute_morphometrics import compute_stats_cv
+from axon_projection.compute_morphometrics import get_axons
+from axon_projection.plot_utils import plot_trunk
 from axon_projection.plot_utils import plot_tuft
 
 
 def create_tuft_morphology(morph, tuft_nodes_ids, common_ancestor, common_path_, shortest_paths):
     """Create a new morphology containing only the given tuft."""
-    tuft_morph = Morphology(morph)
+    tuft_morph = morph
+    tuft_ancestor = tuft_morph.section(common_ancestor)
+
+    if len(tuft_nodes_ids) == 1:
+        for sec in tuft_morph.sections:
+            if sec.id == tuft_ancestor.id:
+                continue
+            tuft_morph._morphio_morph.delete_section(sec.to_morphio(), recursive=False)
+        return tuft_morph, tuft_ancestor
 
     tuft_nodes_paths = set(
         j
@@ -47,19 +54,18 @@ def create_tuft_morphology(morph, tuft_nodes_ids, common_ancestor, common_path_,
     # the tuft_ancestor is the section of the common ancestor of all points of the tuft
     # logging.debug("nodes.at[%s,'section_id'] = %s",
     # common_ancestor, nodes.at[common_ancestor,'section_id'])
-    tuft_ancestor = tuft_morph.section(common_ancestor)
     # logging.debug("tuft_ancestor : %s", tuft_ancestor)
 
     # delete all sections from the morph which do not belong to this tuft
     for i in tuft_morph.sections:
         if i.id not in tuft_nodes_paths:
-            tuft_morph.delete_section(i.morphio_section, recursive=False)
+            tuft_morph._morphio_morph.delete_section(i.to_morphio(), recursive=False)
 
     # delete all sections upstream of the tuft_ancestor
-    for sec in list(tuft_ancestor.iter(IterType.upstream)):
+    for sec in list(tuft_ancestor.iupstream()):
         if sec is tuft_ancestor:
             continue
-        tuft_morph.delete_section(sec, recursive=False)
+        tuft_morph._morphio_morph.delete_section(sec.to_morphio(), recursive=False)
 
     return tuft_morph, tuft_ancestor
 
@@ -70,12 +76,13 @@ def separate_tuft(
     class_assignment,
     pop_id,
     n_terms,
-    nodes,
     directed_graph,
+    shortest_path,
+    sections_id_to_nodes_id,
     group,
     group_name,
     out_path_tufts,
-    plot_debug=True,
+    plot_debug=False,
 ):
     """Separates a tuft from a given morphology and computes various properties of the tuft.
 
@@ -96,11 +103,14 @@ def separate_tuft(
         including the barcode and tuft orientation.
     """
     morph_file = group["morph_path"].iloc[0]
-    morph = nm.load_morphology(morph_file)
+    # we load the morphology here because it can't be passed as an argument for a process
+    morph = nm.load_morphology(morph_file, process_subtrees=True)
+    morph._morphio_morph = morphio.mut.Morphology(morph_file)
+    # morph = load_neuron_from_morphio(morph_file)
     # keep only the axon of morph
-    for i in morph.root_sections:
+    for i in morph._morphio_morph.root_sections:
         if i.type != nm.AXON:
-            morph.delete_section(i)
+            morph._morphio_morph.delete_section(i)
     morph_name = morph_file.split("/")[-1].split(".")[0]
 
     target = group["target"].iloc[0]
@@ -109,27 +119,12 @@ def separate_tuft(
         "morph_path": morph_file,
         "source": source,
         "population_id": pop_id,
+        "axon_id": group["axon_id"].iloc[0],
         "class_assignment": class_assignment,
         "target": target,
         "n_terms": n_terms,
     }
     logging.debug("Treating tuft %s", tuft)
-
-    # ------ TODO Do that once for all tufts -------
-    # logging.debug("Nodes : %s", nodes)
-
-    # compute the shortest path to all the terminals of the morpho once
-    shortest_path = nx.single_source_shortest_path(directed_graph, -1)
-    # logging.debug("shortest paths : %s", shortest_path)
-
-    # create mapping from morph sections ids to graph nodes ids
-    sections_id_to_nodes_id = {}
-    nodes_id = nodes.index.tolist()
-    for n_id in nodes_id:
-        sections_id_to_nodes_id.update({nodes.at[n_id, "section_id"]: n_id})
-    # logging.debug("sections to nodes : %s", sections_id_to_nodes_id)
-
-    # -----
 
     # logging.debug("Group[section_ids] %s", group['section_id'].tolist())
     # convert the terminal sections of the tuft to graph nodes IDs
@@ -145,18 +140,24 @@ def separate_tuft(
     )
 
     # find the common ancestor of the tuft
-    if len(group) == 1 and len(tuft_common_path) > 2:
-        common_ancestor_shift = -2
+    # if the tuft has only one terminal, the common ancestor is this terminal
+    # if len(group) == 1 and len(tuft_common_path) > 2:
+    #     common_ancestor_shift = -2
+    # else:
+    common_ancestor_shift = -1
+    if len(group) == 1:
+        common_ancestor = tuft_terminal_nodes[0]
+        tuft_morph_common_path = shortest_path[common_ancestor]
     else:
-        common_ancestor_shift = -1
-    common_ancestor = tuft_common_path[common_ancestor_shift]
+        common_ancestor = tuft_common_path[common_ancestor_shift]
+        tuft_morph_common_path = tuft_common_path[:common_ancestor_shift]
 
     # create tuft morph from section_ids and common ancestor using create_tuft_morpho
     tuft_morph, tuft_ancestor = create_tuft_morphology(
         morph,
         tuft_terminal_nodes,
         common_ancestor,
-        tuft_common_path[:common_ancestor_shift],
+        tuft_morph_common_path,
         shortest_path,
     )
 
@@ -164,28 +165,26 @@ def separate_tuft(
     # Compute the tuft center
     tuft_center = np.mean(tuft_morph.points, axis=0)
     # Compute tuft orientation with respect to tuft common ancestor
-    tuft_orientation = tuft_center[:-1] - tuft_ancestor.points[-1]
+    tuft_orientation = tuft_center[0:3] - tuft_ancestor.points[-1][0:3]
     tuft_orientation /= np.linalg.norm(tuft_orientation)
 
-    # # Resize the common section used as root (the root section is 1um)
-    # resize_root_section(tuft_morph, tuft_orientation)
-
     # compute the barcode of the tuft
-    barcode = get_barcode(tuft_morph)
+    barcode = get_barcode(tuft_morph._morphio_morph)
 
     # store barcode with tuft properties in dict
     tuft.update(
         {
             "barcode": np.array(barcode).tolist(),
             "tuft_orientation": tuft_orientation,
-            "tuft_ancestor": tuft_ancestor.points[-1],
+            "tuft_ancestor": tuft_ancestor.points[-1][0:3],
+            "common_ancestor_node_id": common_ancestor,
         }
     )
     # Export the tuft
     export_tuft_path = Path(out_path_tufts) / morph_name
     export_tuft_morph_path = export_tuft_path / f"{target.replace('/','-')}.asc"
     # write the tuft_morph file
-    tuft_morph.write(export_tuft_morph_path)
+    tuft_morph._morphio_morph.write(export_tuft_morph_path)
     logging.debug("Written tuft %s to %s.", tuft, export_tuft_morph_path)
     #  that will populate tufts dataframe
     tuft.update({"tuft_morph": str(export_tuft_morph_path)})
@@ -356,7 +355,7 @@ def compute_tuft_properties(config):
 
     logging.debug("Found %s morphs from terminals file %s.", len(list_morphs), morphos_path)
     with Manager() as manager:
-        res_queue = manager.Queue()
+        tufts_res_queue = manager.Queue()
 
         with Pool() as pool:
             args_list = []
@@ -364,7 +363,8 @@ def compute_tuft_properties(config):
             for morph_file in list_morphs:
                 logging.info("Processing tufts of morph %s...", morph_file)
                 # load the morphology
-                morph = nm.load_morphology(morph_file)
+                morph = nm.load_morphology(morph_file, process_subtrees=True)
+                # morph = load_neuron_from_morphio(morph_file)
                 morph_name = f"{Path(morph_file).with_suffix('').name.replace('/','-')}"
                 # create output dir for the tufts of this morph
                 os.makedirs(out_path_tufts + "/" + morph_name, exist_ok=True)
@@ -372,33 +372,60 @@ def compute_tuft_properties(config):
                 axons = get_axons(morph)
                 # filter the terminals of this morph only
                 terms_morph = terminals_df[terminals_df["morph_path"] == morph_file]
+                # initialize here the directed graph(s) of the morph,
+                # which is a dict of directed graphs for each axon_id of this morph
+                directed_graphs = {}
+                # same for the nodes of the graphs
+                nodes_dfs = {}
+                shortest_paths = {}
+                sections_id_to_nodes_ids = {}
 
                 # for each target region of this morpho and for each axon
                 for (group_name, axon_id), group in terms_morph.groupby(["target", "axon_id"]):
                     # group is the df with terminals in current target
                     n_terms = len(group)  # n_terminals is equal to the number of elements in group
-                    if n_terms < 2:
-                        logging.debug(
-                            "Skipped tuft in %s (axon_id %s) with only %s terminal point. [%s]",
-                            group_name,
-                            axon_id,
-                            n_terms,
-                            morph_file,
-                        )
-                        continue
+                    # if n_terms < 2:
+                    #     logging.debug(
+                    #         "Skipped tuft in %s (axon_id %s) with only %s terminal point. [%s]",
+                    #         group_name,
+                    #         axon_id,
+                    #         n_terms,
+                    #         morph_file,
+                    #     )
+                    #     continue
                     axon = axons[axon_id]
-                    # create a graph from the morpho
-                    nodes_df, __, directed_graph = neurite_to_graph(axon)
+                    # if we don't have yet a graph for this axon
+                    if directed_graphs.get(axon_id) is None:
+                        # create a graph from the morpho
+                        (
+                            nodes_df,
+                            __,
+                            directed_graph,
+                        ) = neurite_to_graph(axon)
+                        # store it in the dict
+                        directed_graphs[axon_id] = directed_graph
+                        nodes_dfs[axon_id] = nodes_df
+                        # compute here the shortest paths to all terminals of this morpho's axon
+                        shortest_paths[axon_id] = nx.single_source_shortest_path(directed_graph, -1)
+                        # logging.debug("shortest paths : %s", shortest_path)
+                        # create mapping from morph sections ids to graph nodes ids
+                        sections_id_to_nodes_id = {}
+                        nodes_id = nodes_df.index.tolist()
+                        for n_id in nodes_id:
+                            sections_id_to_nodes_id.update({nodes_df.at[n_id, "section_id"]: n_id})
+                        # and save this mapping to not compute it again
+                        sections_id_to_nodes_ids[axon_id] = sections_id_to_nodes_id
 
                     args = (
-                        res_queue,
+                        tufts_res_queue,
                         classes_df[classes_df["morph_path"] == morph_file]["class_assignment"].iloc[
                             0
                         ],
                         classes_df[classes_df["morph_path"] == morph_file]["population_id"].iloc[0],
                         n_terms,
-                        nodes_df,
-                        directed_graph,
+                        directed_graphs[axon_id],
+                        shortest_paths[axon_id],
+                        sections_id_to_nodes_ids[axon_id],
                         group,
                         group_name,
                         out_path_tufts,
@@ -411,8 +438,8 @@ def compute_tuft_properties(config):
             pool.starmap(separate_tuft, args_list)
 
         # Retrieve results from the queue
-        while not res_queue.empty():
-            all_tufts.append(res_queue.get())
+        while not tufts_res_queue.empty():
+            all_tufts.append(tufts_res_queue.get())
 
     # build tufts dataframe
     tufts_df = pd.DataFrame(all_tufts)
@@ -437,12 +464,242 @@ def compute_tuft_properties(config):
     logging.info("Writing tufts dataframe to %s...", out_path + "tufts_df.csv")
     tufts_df.to_csv(out_path + "tufts_df.csv")
 
-    # export tufts as json
     logging.info("Writing tufts JSON to %s...", out_path + "tufts_properties.json")
+    # format the df for synthesis inputs
+    tufts_json = tufts_df.rename(
+        columns={"rep_score": "weight", "tuft_orientation": "orientation"}, inplace=False
+    )
+    tufts_json.drop(
+        columns=[
+            "morph_path",
+            "source",
+            "class_assignment",
+            "axon_id",
+            "target",
+            "tuft_morph",
+            "n_terms",
+            "tuft_ancestor",
+            "common_ancestor_node_id",
+        ],
+        inplace=True,
+    )
+    # export tufts as json
     with pathlib.Path(out_path + "tufts_properties.json").open(mode="w", encoding="utf-8") as f:
-        json.dump(tufts_df.to_dict("records"), f, indent=4)
+        json.dump(tufts_json.to_dict("records"), f, indent=4)
 
     logging.info("Done classifying tufts.")
+
+    return tufts_df
+
+
+def trunk_path(graph, ancestor_nodes, source=None, shortest_paths=None):
+    """Compute the union of paths from the root to the given nodes.
+
+    Source should be given only if the graph if undirected.
+    Shortest paths can be given if they were already computed before.
+
+    .. warning:: The graph must have only one component.
+    """
+    if not isinstance(graph, nx.DiGraph) and source is None and shortest_paths is None:
+        raise ValueError(
+            "Either the source or the pre-computed shortest paths must be provided when using "
+            "an undirected graph."
+        )
+
+    if shortest_paths is None:
+        if isinstance(graph, nx.DiGraph):
+            try:
+                sources = [k for k, v in graph.in_degree if v == 0]
+                if len(sources) > 1:
+                    raise RuntimeError("Several roots found in the directed graph.")
+                source = sources[0]
+            except IndexError:
+                # pylint: disable=raise-missing-from
+                raise RuntimeError("Could not find the root of the directed graph.")
+        shortest_paths = nx.single_source_shortest_path(graph, source)
+
+    # trunk path is computed as the exclusive union of paths to all tufts ancestors
+    trunk_path_ = set()
+    for ancestor_node in list(ancestor_nodes):
+        trunk_path_.update(set(shortest_paths[ancestor_node]))
+
+    # convert to a list to make it iterable
+    trunk_path_ = list(trunk_path_)
+
+    return trunk_path_
+
+
+def separate_trunk(
+    res_queue,
+    axon_id,
+    morph_file,
+    directed_graph,
+    tufts_common_ancestors_node_ids,
+    morph_terminals,
+    trunk_morphometrics,
+    out_path_trunks,
+    plot_debug=False,
+):
+    """Separate trunk for given axon and morphological file, and compute morphometrics.
+
+    Args:
+        res_queue: Queue to store the result
+        axon_id: ID of the axon
+        morph_file: File path to the morphology
+        directed_graph: Directed graph of the morphology
+        tufts_common_ancestors_node_ids: List of common ancestor node IDs for tufts
+        morph_terminals: Terminals of the morphology
+        trunk_morphometrics: List of trunk morphometrics to compute
+        out_path_trunks: Output path for storing the trunks
+        plot_debug: Flag to enable debug plotting (default is False)
+
+    Returns:
+        None
+    """
+    logging.debug("Separating trunk for axon %s, %s", morph_file, axon_id)
+    trunk = {"atlas_region_id": morph_terminals["source_id"].iloc[0]}
+    # create trunk morphology from graph
+    # the trunk is computed as the union path to all tufts' ancestors
+    trunk_common_path = trunk_path(directed_graph, list(tufts_common_ancestors_node_ids))
+    trunk_morph = nm.load_morphology(morph_file, process_subtrees=True)
+    trunk_morph._morphio_morph = morphio.mut.Morphology(morph_file)
+
+    # delete all sections from the morph which do not belong to the trunk
+    for i in trunk_morph.sections:
+        if i.id not in trunk_common_path:
+            trunk_morph._morphio_morph.delete_section(i.to_morphio(), recursive=False)
+
+    # keep only the axon of morph
+    for i in trunk_morph._morphio_morph.root_sections:
+        if i.type != nm.AXON:
+            trunk_morph._morphio_morph.delete_section(i)
+
+    # compute morphometrics
+    for stat in trunk_morphometrics:
+        stat_res = nm.get(stat, trunk_morph.neurites)
+        stat_res = np.concatenate(([row for row in stat_res if len(row) > 0]))
+        trunk.update({"mean_" + str(stat): np.mean(stat_res), "std_" + str(stat): np.std(stat_res)})
+
+    # save/plot it
+    morph_name = f"{Path(morph_file).with_suffix('').name.replace('/','-')}"
+    export_trunk_path = Path(out_path_trunks) / morph_name
+    export_trunk_morph_path = export_trunk_path / f"trunk_{axon_id}.asc"
+    # write the trunk morph file
+    trunk_morph._morphio_morph.write(export_trunk_morph_path)
+    logging.debug("Written trunk %s to %s.", trunk, export_trunk_morph_path)
+    #  that will populate tufts dataframe
+    trunk.update({"trunk_morph": str(export_trunk_morph_path)})
+    # plot the tuft
+    if plot_debug:
+        export_trunk_fig_path = export_trunk_path / f"trunk_{axon_id}.html"
+        plot_trunk(morph_file, trunk_morph, morph_terminals, "Trunk", export_trunk_fig_path)
+
+    # output the trunk
+    res_queue.put(trunk)
+
+
+def compute_trunk_properties(config, tufts_df):
+    """Launches in parallel the separation of trunks and computation of their properties."""
+    out_path = config["output"]["path"]
+    plot_debug = config["separate_tufts"]["plot_debug"].lower() == "true"
+    terminals_df = pd.read_csv(out_path + "terminals.csv")
+    out_path_trunks = out_path + "trunks"
+    features_str = config["separate_tufts"]["trunk_morphometrics"]
+    morphometrics = [feature.strip() for feature in features_str.split(",")]
+    os.makedirs(out_path_trunks, exist_ok=True)
+
+    terminals_df = pd.read_csv(out_path + "terminals.csv")
+    list_morphs = terminals_df.morph_path.unique()
+
+    # TODO add brain region id
+
+    morphio.set_maximum_warnings(1)
+
+    all_trunks = []
+    with Manager() as manager:
+        trunks_res_queue = manager.Queue()
+
+        with Pool() as pool:
+            args_list = []
+            # Isolate each tuft of a morphology
+            for morph_file in list_morphs:
+                logging.info("Processing trunk of morph %s...", morph_file)
+                # load the morphology
+                morph = nm.load_morphology(morph_file, process_subtrees=True)
+                # morph = load_neuron_from_morphio(morph_file)
+                morph_name = f"{Path(morph_file).with_suffix('').name.replace('/','-')}"
+                # create output dir for the tufts of this morph
+                os.makedirs(out_path_trunks + "/" + morph_name, exist_ok=True)
+                # select only the axon(s) of the morph
+                axons = get_axons(morph)
+
+                # for each target region of this morpho and for each axon
+                for axon_id, axon in enumerate(axons):
+                    # create a graph from the morpho
+                    (
+                        _,
+                        __,
+                        directed_graph,
+                    ) = neurite_to_graph(axon)
+                    # # create mapping from morph sections ids to graph nodes ids
+                    # sections_id_to_nodes_id = {}
+                    # nodes_id = nodes_df.index.tolist()
+                    # for n_id in nodes_id:
+                    #     sections_id_to_nodes_id.update({nodes_df.at[n_id, "section_id"]: n_id})
+                    tufts_common_ancestors_nodes = set(
+                        tufts_df[
+                            (tufts_df["morph_path"] == morph_file)
+                            & (tufts_df["axon_id"] == axon_id)
+                        ]["common_ancestor_node_id"].values
+                    )
+                    if len(tufts_common_ancestors_nodes) == 0:
+                        continue
+                    # filter only the terminals for this axon
+                    filtered_terms_df = terminals_df[
+                        (terminals_df["morph_path"] == morph_file)
+                        & (terminals_df["axon_id"] == axon_id)
+                    ]
+                    # arguments for separate trunk function
+                    args = (
+                        trunks_res_queue,
+                        axon_id,
+                        morph_file,
+                        directed_graph,
+                        tufts_common_ancestors_nodes,
+                        filtered_terms_df,
+                        morphometrics,
+                        out_path_trunks,
+                        plot_debug,
+                    )
+                    args_list.append(args)
+
+            logging.debug("Launching jobs for %s trunks...", len(args_list))
+            # Launch separate_tuft function for each set of arguments in parallel
+            pool.starmap(separate_trunk, args_list)
+
+        # Retrieve results from the queue
+        while not trunks_res_queue.empty():
+            all_trunks.append(trunks_res_queue.get())
+
+    # build tufts dataframe
+    trunks_df = pd.DataFrame(all_trunks)
+    # and output it
+    logging.info("Writing trunks dataframe to %s...", out_path + "trunks_df.csv")
+    trunks_df.to_csv(out_path + "trunks_df.csv")
+
+    trunks_df.drop(columns=["trunk_morph"], inplace=True)
+    logging.info("Writing trunks JSON to %s...", out_path + "trunks_properties.json")
+    # export tufts as json
+    with pathlib.Path(out_path + "trunks_properties.json").open(mode="w", encoding="utf-8") as f:
+        json.dump(trunks_df.to_dict("records"), f, indent=4)
+
+
+def compute_morph_properties(config):
+    """Compute morphological properties of tufts and trunks using the given configuration."""
+    tufts_df = compute_tuft_properties(config)
+    # keep only columns that are useful for the trunks computation
+    tufts_df = tufts_df[["morph_path", "axon_id", "common_ancestor_node_id"]]
+    compute_trunk_properties(config, tufts_df)
 
 
 if __name__ == "__main__":
@@ -452,4 +709,4 @@ if __name__ == "__main__":
     config_ = configparser.ConfigParser()
     config_.read(sys.argv[1])
 
-    compute_tuft_properties(config_)
+    compute_morph_properties(config_)

@@ -9,7 +9,7 @@ from axon_projection.check_atlas import compare_axonal_projections
 from axon_projection.check_atlas import compare_source_regions
 from axon_projection.classify_axons import run_classification as classify_axons
 from axon_projection.sample_axon import main as sample_axon
-from axon_projection.separate_tufts import compute_tuft_properties
+from axon_projection.separate_tufts import compute_morph_properties
 from axon_projection.visualize_connections import create_conn_graphs
 
 if __name__ == "__main__":
@@ -38,7 +38,7 @@ if __name__ == "__main__":
         create_conn_graphs(config)
 
     # compute tuft properties and give them a representativity score
-    compute_tuft_properties(config)
+    compute_morph_properties(config)
 
     # sample an axon's tufts, given a source region
     picked_tufts_df = sample_axon(config, config["sample_axon"]["source_region"])

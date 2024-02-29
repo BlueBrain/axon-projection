@@ -17,7 +17,7 @@ reqs = [
     "click>=7",
     "matplotlib",
     "networkx>=3.1",
-    "neurom>=3.2.4",
+    "neurom @ git+https://github.com/BlueBrain/NeuroM.git@v4",
     "nexusforge>=0.8.1",
     "numpy",
     "pandas>=1.5.3",

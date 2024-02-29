@@ -18,7 +18,8 @@ def plot_html(
     If `morph2` is not None then the given morphology is also plotted for comparison.
     """
     if isinstance(morph_path, (str, Path)):
-        morph = load_morphology(morph_path)
+        morph = load_morphology(morph_path, process_subtrees=True)
+        # morph = load_neuron_from_morphio(morph_path)
     else:
         morph = morph_path
     fig_builder = NeuronBuilder(morph, "3d", line_width=4, title=f"{morph_name}")
@@ -27,7 +28,8 @@ def plot_html(
 
     if morph_path2 is not None:
         if isinstance(morph_path2, (str, Path)):
-            morph2 = load_morphology(morph_path2)
+            morph2 = load_morphology(morph_path2, process_subtrees=True)
+            # morph2 = load_neuron_from_morphio(morph_path2)
         else:
             morph2 = morph_path2
         if morph_name2 is None:
@@ -58,7 +60,7 @@ def plot_html(
 
 
 def plot_tuft(morph, tuft_morph, group, group_name, cluster_df, output_path):
-    """Plot tuft to a HTML figure."""
+    """Plot tuft and morph to a HTML figure."""
     plotted_morph = Morphology(
         morph,
         name=Path(group_name).with_suffix("").name,
@@ -153,4 +155,58 @@ def plot_tuft(morph, tuft_morph, group, group_name, cluster_df, output_path):
     fig.write_html(str(output_path))
 
     # add_camera_sync(str(output_path))
-    logging.debug("Exported figure to %s", output_path)
+    # logging.debug("Exported figure to %s", output_path)
+
+
+def plot_trunk(morph, trunk_morph, group, group_name, output_path):
+    """Plot trunk and morph to a HTML figure."""
+    plotted_morph = Morphology(
+        morph,
+        name=Path(group_name).with_suffix("").name,
+    )
+    fig_builder = NeuronBuilder(plotted_morph, "3d", line_width=4, title=f"{plotted_morph.name}")
+
+    x, y, z = group[["x", "y", "z"]].values.T
+    node_trace = go.Scatter3d(
+        x=x,
+        y=y,
+        z=z,
+        mode="markers",
+        marker={"size": 3, "color": "black"},
+        name="Morphology nodes",
+    )
+
+    # Build the trunk figure
+    trunk_builder = NeuronBuilder(
+        trunk_morph,
+        "3d",
+        line_width=4,
+        title=f"Trunk {group_name}",
+    )
+
+    # Create the figure from the traces
+    fig = make_subplots(
+        cols=2,
+        specs=[[{"is_3d": True}, {"is_3d": True}]],
+        subplot_titles=("Complete morphology", "Trunk"),
+    )
+
+    morph_data = fig_builder.get_figure()["data"]
+    fig.add_traces(morph_data, rows=[1] * len(morph_data), cols=[1] * len(morph_data))
+    fig.add_trace(node_trace, row=1, col=1)
+
+    trunk_morph_data = trunk_builder.get_figure()["data"]
+    fig.add_traces(
+        trunk_morph_data,
+        rows=[1] * len(trunk_morph_data),
+        cols=[2] * len(trunk_morph_data),
+    )
+
+    fig.update_scenes({"aspectmode": "data"})
+
+    # Export figure
+    logging.debug("Exporting figure to %s", output_path)
+    fig.write_html(str(output_path))
+
+    # add_camera_sync(str(output_path))
+    # logging.debug("Exported figure to %s", output_path)

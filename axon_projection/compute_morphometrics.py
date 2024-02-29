@@ -9,7 +9,21 @@ import matplotlib.pyplot as plt
 import neurom as nm
 import numpy as np
 import pandas as pd
+from neurom import NeuriteType
 from synthesis_workflow.validation import mvs_score
+
+
+def get_axons(morph):
+    """Get axons of the given morphology."""
+    axons_list = []
+    try:
+        axons_list = [i for i in morph.neurites if i.type == NeuriteType.axon]
+    except Exception as e:
+        logging.debug("Found several neurite types [%s]", repr(e))
+        for i in morph.neurites:
+            logging.debug("%s : data type %s", i.subtree_types, type(i.subtree_types))
+        axons_list = [i for i in morph.neurites if NeuriteType.axon in i.subtree_types]
+    return axons_list
 
 
 def compute_stat(which_feature, pop, n_type, res_queue):
@@ -18,7 +32,7 @@ def compute_stat(which_feature, pop, n_type, res_queue):
     res_queue.put({which_feature: val})
 
 
-def compute_stats(morphometrics, pop, neurite_type):
+def compute_stats(morphometrics, pop, neurite_type=nm.AXON):
     """Computes all morphometrics on the population, and returns the results as a dict."""
     # get the results
     res_dict = {}
@@ -30,7 +44,7 @@ def compute_stats(morphometrics, pop, neurite_type):
     return res_dict
 
 
-def compute_stats_parallel(morphometrics, pop, neurite_type):
+def compute_stats_parallel(morphometrics, pop, neurite_type=nm.AXON):
     """Computes all morphometrics on the pop in parallel, and returns the results as a dict."""
     processes_launched = []
     res_queue = Queue()
@@ -68,7 +82,8 @@ def compute_stats_cv(
     # if morph_file and list_other_morphs are paths, load the morphos there
     if morphs_as_paths:
         # load the morpho
-        morph = nm.load_morphology(morph_file)
+        morph = nm.load_morphology(morph_file, process_subtrees=True)
+        # morph = load_neuron_from_morphio(morph_file)
         # load the remaining population
         other_morphs = nm.load_morphologies(list_other_morphs)
         dict_rows = {"morph_path": morph_file}

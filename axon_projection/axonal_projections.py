@@ -9,11 +9,11 @@ from collections import Counter
 import neurom as nm
 import numpy as np
 import pandas as pd
-from axon_synthesis.utils import get_axons
 from neurom.core.morphology import Section
 from neurom.core.morphology import iter_sections
 
 from axon_projection.choose_hierarchy_level import get_region_at_level
+from axon_projection.compute_morphometrics import get_axons
 from axon_projection.query_atlas import load_atlas
 
 
@@ -73,16 +73,21 @@ def create_ap_table(
     region_names = {}
 
     # counters for problematic morphologies
+    # without axon
     num_morphs_wo_axon = 0
+    # source is out of bounds (of this atlas)
+    num_oob_morphs = 0
+    # other problem, morph can't be loaded
     num_bad_morphs = 0
     num_total_morphs = len(list_morphs)
     logging.info("Found %s morphologies at %s", num_total_morphs, morph_dir)
     # Register each morpho in directory one by one
     for i, morph_file in enumerate(list_morphs):
-        logging.info("Processing %s, progress : %s %% ", morph_file, 100.0 * i / num_total_morphs)
+        logging.info("Processing %s, progress : %.2f %% ", morph_file, 100.0 * i / num_total_morphs)
         # load morpho
         try:
-            morph = nm.load_morphology(morph_file)  # , use_subtrees=True)
+            morph = nm.load_morphology(morph_file, process_subtrees=True)
+            # morph = nm.core.Morphology(Morphology(load_neuron_from_morphio(morph_file)))
         except Exception as e:  # pylint: disable=broad-except
             # skip this morph if it could not be loaded
             num_bad_morphs += 1
@@ -91,6 +96,7 @@ def create_ap_table(
 
         terminal_id = 0
         source_pos = morph.soma.center
+        # source_pos = morph.soma.get_center()
         # if morph doesn't have a soma, take the average of the first points of
         # each sections of basal dendrites as source pos
         if source_pos is None or (isinstance(source_pos, list) and len(source_pos) == 0):
@@ -120,9 +126,11 @@ def create_ap_table(
                 region_names[source_region] = [source_region_id, source_asc, source_names]
         except Exception as e:  # pylint: disable=broad-except
             if "Region ID not found" in repr(e) or "Out" in repr(e):
-                num_bad_morphs += 1
                 logging.warning("Source region could not be found.")
-            logging.info("Skipping axon. [Error: %s]", repr(e))
+            logging.info(
+                "Skipping axon. Error while retrieving region from atlas [Error: %s]", repr(e)
+            )
+            num_oob_morphs += 1
             continue
 
         axon = {"morph_path": morph_file, "source": source_region}
@@ -131,7 +139,12 @@ def create_ap_table(
         # def axon_filter(n, id):
         #     return n.type == nm.AXON and n.id == id
 
-        axon_neurites = get_axons(morph)
+        try:
+            axon_neurites = get_axons(morph)
+        except Exception as e:
+            logging.debug("Axon could not be found. [Error: %s]", repr(e))
+            num_morphs_wo_axon += 1
+            continue
         res = []
         for axon_id, axon_neurite in enumerate(axon_neurites):
             # first find the terminal points
@@ -143,7 +156,7 @@ def create_ap_table(
         try:
             sections_id, terminal_points, axon_ids = zip(*res)
         except Exception as e:  # pylint: disable=broad-except
-            num_bad_morphs += 1
+            num_morphs_wo_axon += 1
             logging.warning("No terminal points found. [Error: %s]", repr(e))
             continue
         sections_id = list(sections_id)
@@ -174,12 +187,20 @@ def create_ap_table(
                     dict_acronyms_at_level[term_pt_asc[0]] = acronym_at_level
                 # and store it in the list of targeted regions of this morph
                 terminals_regions.append(dict_acronyms_at_level[term_pt_asc[0]])
+                # add this terminal point's region to the region_names dict, with his ascendants
+                if acronym_at_level not in region_names:
+                    region_names[acronym_at_level] = [
+                        region_map.get(brain_reg_voxels, "id", with_ascendants=False),
+                        region_map.get(brain_reg_voxels, "acronym", with_ascendants=True),
+                        region_map.get(brain_reg_voxels, "name", with_ascendants=True),
+                    ]
                 # finally, store this terminal for the tufts clustering
                 rows_terminals.append(
                     {
                         "morph_path": morph_file,
                         "axon_id": axon_ids[terminal_id],
                         "source": source_region,
+                        "source_id": region_names[acronym_at_level][0],
                         "target": dict_acronyms_at_level[term_pt_asc[0]],
                         "terminal_id": terminal_id,
                         "section_id": sections_id[terminal_id],
@@ -189,13 +210,6 @@ def create_ap_table(
                     }
                 )
 
-                # add this terminal point's region to the region_names dict, with his ascendants
-                if acronym_at_level not in region_names:
-                    region_names[acronym_at_level] = [
-                        region_map.get(brain_reg_voxels, "id", with_ascendants=False),
-                        region_map.get(brain_reg_voxels, "acronym", with_ascendants=True),
-                        region_map.get(brain_reg_voxels, "name", with_ascendants=True),
-                    ]
                 terminal_id += 1
             except Exception as e:  # pylint: disable=broad-except
                 if "Region ID not found" in repr(e) or "Out" in repr(e):
@@ -215,6 +229,7 @@ def create_ap_table(
         rows_check.append(
             {
                 "source": source_region,
+                "source_label": region_names[source_region][2][0],
                 "OOB": nb_oob_pts,
                 "morph": morph_file,
                 "name": morph_name_without_extension,
@@ -222,15 +237,17 @@ def create_ap_table(
         )
     # end for morph
 
-    if num_bad_morphs > 0:
-        logging.info("Skipped %s morphologies that couldn't be loaded.", num_bad_morphs)
-    if num_morphs_wo_axon > 0:
+    if num_bad_morphs > 0 or num_oob_morphs > 0 or num_morphs_wo_axon > 0:
         logging.info(
-            "Skipped %s morphologies that did not have axon terminal points.", num_morphs_wo_axon
+            "Skipped %s morphologies that couldn't be loaded, %s out of bounds, %s without axon",
+            num_bad_morphs,
+            num_oob_morphs,
+            num_morphs_wo_axon,
         )
+
     logging.info(
         "Extracted projection pattern from %s axons.",
-        num_total_morphs - num_bad_morphs - num_morphs_wo_axon,
+        num_total_morphs - num_bad_morphs - num_morphs_wo_axon - num_oob_morphs,
     )
     # df that will contain the classification data,
     # i.e. pairs of s_a, [t_a]

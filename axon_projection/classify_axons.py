@@ -217,14 +217,17 @@ def run_classification(config):
                 # don't show probability if it's 0
                 if gmm.means_[c][t] < 1e-16:
                     continue
+                source_pop_id = str(region_names_df.at[s_a, "id"]) + "_" + str(c)
+                target_region_id = region_names_df.at[target_region_acronyms[t], "id"]
                 connexion_prob.append(
                     [
                         s_a,
                         region_names_df.at[s_a, "id"],
                         c,
-                        str(region_names_df.at[s_a, "id"]) + "_" + str(c),
+                        source_pop_id,
                         target_region_acronyms[t],
-                        region_names_df.at[target_region_acronyms[t], "id"],
+                        target_region_id,
+                        source_pop_id + "_" + str(target_region_id),
                         gmm.means_[c][t] / np.sum(gmm.means_[c]),
                     ]
                 )
@@ -258,6 +261,7 @@ def run_classification(config):
             "source_population_id",
             "target_region",
             "target_brain_region_id",
+            "target_population_id",
             "probability",
         ],
     )

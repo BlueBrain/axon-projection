@@ -60,6 +60,49 @@ def compare_axonal_projections(config):
         logging.info("Mismatches: %s", differences)
 
 
+def region_is_in_hierarchy_at_dist(region, hierarchy, dist):
+    """Check if region is in hierarchy at distance dist."""
+    return region in hierarchy[:dist]
+
+
+def compute_match_at_hierarchical_dist(df_cmp, hierarchy_col, dist, out_path):
+    """Compute the matches in df_cmp at dist hierarchical distance.
+
+    Args:
+        df_cmp: dataframe containing the comparison
+        hierarchy_col: column name of the hierarchy
+        dist: hierarchical distance
+        out_path: output path
+
+    Returns:
+        None
+    """
+    num_correct_source = 0
+    nb_morphs = len(df_cmp)
+    df_mismatch = df_cmp.copy()
+    for i, row in df_cmp.iterrows():
+        if region_is_in_hierarchy_at_dist(row["manual_source"], row[hierarchy_col], dist):
+            num_correct_source += 1
+            df_mismatch.drop(i, inplace=True)
+    logging.info(
+        "Source regions match at hierarchical distance %s: %.2f %%",
+        dist,
+        100.0 * num_correct_source / nb_morphs,
+    )
+    manual_col = df_mismatch.pop("manual_source")
+    df_mismatch.insert(1, "manual_source", manual_col)
+    df_mismatch.rename(
+        columns={
+            "source": "source_from_atlas",
+            "source_from_atlas": "soruce_from_atlas_label",
+            "manual_source": "registered_source",
+        },
+        inplace=True,
+    )
+    df_mismatch.to_markdown(out_path + "compare_regions_mismatch_" + str(dist) + ".md")
+    df_mismatch.to_csv(out_path + "compare_regions_mismatch_" + str(dist) + ".csv")
+
+
 def compare_source_regions(config):
     """Checks source regions of morphologies detected from the atlas.
 
@@ -80,6 +123,7 @@ def compare_source_regions(config):
     output_path = config["output"]["path"]
     col_name_id = config["compare_source_regions"]["col_name_id"]
     col_name_region = config["compare_source_regions"]["col_name_region"]
+    compare_on_col = config["compare_source_regions"]["compare_on"]
 
     df_atlas = pd.read_csv(from_atlas_path)
     # if we have manual annotation of source regions
@@ -88,11 +132,15 @@ def compare_source_regions(config):
         df_manual = df_manual.rename(columns={col_name_id: "name"})
 
         df_cmp = df_atlas.merge(df_manual, on="name", validate="one_to_one")
-        df_cmp = df_cmp[["name", "source", col_name_region]]
+        df_cmp = df_cmp[["name", "source", "source_label", col_name_region]]
         df_cmp = df_cmp.rename(
-            columns={"source": "source_from_atlas", col_name_region: "manual_source"}
+            columns={compare_on_col: "source_from_atlas", col_name_region: "manual_source"}
         )
         num_correct_source = len(df_cmp[df_cmp["source_from_atlas"] == df_cmp["manual_source"]])
+        # save in another df the mismatches between the two
+        df_mismatch = df_cmp[df_cmp["source_from_atlas"] != df_cmp["manual_source"]]
+        if len(df_mismatch) > 0:
+            df_mismatch.to_markdown(output_path + "compare_regions_mismatch.md")
         logging.info("Source regions match: %.2f %%", 100.0 * num_correct_source / len(df_cmp))
     # if we don't have a manual annotation, just output the atlas source region and its hierarchy
     else:
@@ -103,11 +151,11 @@ def compare_source_regions(config):
     region_map = RegionMap.load_json("mba_hierarchy.json")
     rows_hierarchy = [
         region_map.get(region_map.find(acr, "acronym").pop(), "acronym", with_ascendants=True)
-        for acr in df_cmp["source_from_atlas"]
+        for acr in df_cmp["source"]
     ]
     rows_hierarchy_names = [
         region_map.get(region_map.find(acr, "acronym").pop(), "name", with_ascendants=True)
-        for acr in df_cmp["source_from_atlas"]
+        for acr in df_cmp["source"]
     ]
     df_cmp["atlas_hierarchy"] = rows_hierarchy
     df_cmp["atlas_hierarchy_names"] = rows_hierarchy_names
@@ -115,15 +163,16 @@ def compare_source_regions(config):
     df_cmp.to_markdown(output_path + "compare_regions.md")
 
     # TODO compute a percent match at a coarser granularity to see if we're totally off.
-    # # compare source region match to higher level of hierarchy
-    # if manual_path:
-    #     rows_hierarchy = [region_map.get(region_map.find(acr, "acronym").pop(),
-    # "acronym", with_ascendants=True) for acr in df_cmp["source_from_atlas"]]
-    #     df_cmp["manual_hierarchy"] = rows_hierarchy
-    #     num_correct_source = np.zeros()
-    #     for acr in df_cmp["atlas_hierarchy"]:
-    #         for acr_man in df_cmp["manual_hierarchy"]:
-    #             if acr == acr_man
+    # we assume that the manual source is always at a lower (closer to root) level of hierarchy
+    # because the source from atlas's hierarchy level can be specified by the user in the config
+    if manual_path:
+        if compare_on_col == "source":
+            hierarchy_col = "atlas_hierarchy"
+        else:
+            hierarchy_col = "atlas_hierarchy_names"
+        compute_match_at_hierarchical_dist(df_cmp, hierarchy_col, 1, output_path)
+        compute_match_at_hierarchical_dist(df_cmp, hierarchy_col, 2, output_path)
+        compute_match_at_hierarchical_dist(df_cmp, hierarchy_col, 3, output_path)
 
 
 if __name__ == "__main__":
