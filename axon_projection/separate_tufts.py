@@ -25,7 +25,7 @@ from axon_projection.compute_morphometrics import get_axons
 from axon_projection.plot_utils import plot_trunk
 from axon_projection.plot_utils import plot_tuft
 
-
+# pylint: disable=protected-access
 def create_tuft_morphology(morph, tuft_nodes_ids, common_ancestor, common_path_, shortest_paths):
     """Create a new morphology containing only the given tuft."""
     tuft_morph = morph
@@ -70,7 +70,7 @@ def create_tuft_morphology(morph, tuft_nodes_ids, common_ancestor, common_path_,
     return tuft_morph, tuft_ancestor
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, protected-access
 def separate_tuft(
     res_queue,
     class_assignment,
@@ -528,7 +528,7 @@ def trunk_path(graph, ancestor_nodes, source=None, shortest_paths=None):
 
     return trunk_path_
 
-
+# pylint: disable=protected-access
 def separate_trunk(
     res_queue,
     axon_id,

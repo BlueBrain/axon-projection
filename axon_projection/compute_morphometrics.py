@@ -18,7 +18,7 @@ def get_axons(morph):
     axons_list = []
     try:
         axons_list = [i for i in morph.neurites if i.type == NeuriteType.axon]
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         logging.debug("Found several neurite types [%s]", repr(e))
         for i in morph.neurites:
             logging.debug("%s : data type %s", i.subtree_types, type(i.subtree_types))

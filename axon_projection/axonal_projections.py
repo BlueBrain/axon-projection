@@ -141,7 +141,7 @@ def create_ap_table(
 
         try:
             axon_neurites = get_axons(morph)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logging.debug("Axon could not be found. [Error: %s]", repr(e))
             num_morphs_wo_axon += 1
             continue
