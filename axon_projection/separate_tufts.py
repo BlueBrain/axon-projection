@@ -243,7 +243,7 @@ def compute_tufts_orientation(tufts_df, atlas_path):
 
 
 def compute_rep_score(tufts_df, morphometrics):
-    """Compute representativity scores for tufts based on some morphometrics.
+    """Compute representativity scores for tufts based on given morphometrics.
 
     Args:
         tufts_df (DataFrame): A DataFrame containing information about tufts.
@@ -505,7 +505,7 @@ def trunk_path(graph, ancestor_nodes, source=None, shortest_paths=None):
             "Either the source or the pre-computed shortest paths must be provided when using "
             "an undirected graph."
         )
-
+    # compute shortest paths to every node of the graph, if not given
     if shortest_paths is None:
         if isinstance(graph, nx.DiGraph):
             try:
@@ -544,15 +544,15 @@ def separate_trunk(
     """Separate trunk for given axon and morphological file, and compute morphometrics.
 
     Args:
-        res_queue: Queue to store the result
-        axon_id: ID of the axon
-        morph_file: File path to the morphology
-        directed_graph: Directed graph of the morphology
-        tufts_common_ancestors_node_ids: List of common ancestor node IDs for tufts
-        morph_terminals: Terminals of the morphology
-        trunk_morphometrics: List of trunk morphometrics to compute
-        out_path_trunks: Output path for storing the trunks
-        plot_debug: Flag to enable debug plotting (default is False)
+        res_queue (multiprocessing.Queue): Queue to store the result
+        axon_id (int): ID of the axon
+        morph_file (str): File path to the morphology
+        directed_graph (nx.DiGraph): Directed graph of the morphology
+        tufts_common_ancestors_node_ids (list): List of common ancestor node IDs for tufts
+        morph_terminals (pd.DataFrame): Terminals of the morphology
+        trunk_morphometrics (list): List of trunk morphometrics to compute
+        out_path_trunks (str): Output path for storing the trunks
+        plot_debug (bool): Flag to enable debug plotting (default is False)
 
     Returns:
         None

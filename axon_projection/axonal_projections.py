@@ -290,9 +290,6 @@ def main(config):
 
 
 if __name__ == "__main__":
-    # prior to that, download all morphologies from ML with long-range axons
-    # run morphology-workflows on them (repair, curate, etc...)
-
     logging.basicConfig(level=logging.DEBUG)
 
     config_ = configparser.ConfigParser()

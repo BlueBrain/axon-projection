@@ -32,7 +32,8 @@ def find_good_gmm(data, n_components_max, seed=None, best=False, n_jobs=12):
         The algorithm will use at most n_components_max classes for the clustering.
         seed (int) : random seed, for reproducibility. Seed is used for the random initialization
             of the GMMs (as is done in K-means algorithm)
-        best (bool) : if True, the best GMM found is returned.
+        best (bool) : if True, the best GMM found is returned. Otherwise, we pick one
+            based on its BIC score.
         n_jobs (int) : number of processes used in the search.
 
     Returns:
@@ -70,13 +71,14 @@ def find_good_gmm(data, n_components_max, seed=None, best=False, n_jobs=12):
     )
     if best:
         return grid_search.best_params_, res
+
     # if we don't ask for the best, compute a pick probability for each combination of params
     min_bic = res["BIC"].min()
     # compute the probability as a Gaussian distribution
     res["pick_prob"] = np.exp(-pow(res["BIC"], 2.0) / pow(min_bic, 2.0))
     res["pick_prob"] = res["pick_prob"] / res["pick_prob"].sum()
     # and draw a combination based on this probability
-    good_params = res.sample(n=1, weights="pick_prob")
+    good_params = res.sample(n=1, weights="pick_prob", random_state=seed)
     logging.info("Picked %s", good_params)
     return good_params.to_dict("records")[0], res
 
