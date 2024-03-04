@@ -2,6 +2,7 @@
 import configparser
 import logging
 import sys
+from os import makedirs
 
 import numpy as np
 import pandas as pd
@@ -15,8 +16,8 @@ def gmm_bic_score(estimator, data):
     return -estimator.bic(data)
 
 
-def find_best_gmm(data, n_components_max, seed=None, n_jobs=12):
-    """Finds the best number of components for a GMM on the given data.
+def find_good_gmm(data, n_components_max, seed=None, best=False, n_jobs=12):
+    """Finds a good number of components and variance type for a GMM on the given data.
 
     Takes in input the data on which we want to build a Gaussian Mixture Model (GMM),
     and the maximum number of mixture components desired. Returns the best number of
@@ -29,6 +30,7 @@ def find_best_gmm(data, n_components_max, seed=None, n_jobs=12):
         The algorithm will use at most n_components_max classes for the clustering.
         seed (int) : random seed, for reproducibility. Seed is used for the random initialization
             of the GMMs (as is done in K-means algorithm)
+        best (bool) : if True, the best GMM found is returned.
         n_jobs (int) : number of processes used in the search.
 
     Returns:
@@ -64,8 +66,17 @@ def find_best_gmm(data, n_components_max, seed=None, n_jobs=12):
             "mean_test_score": "BIC",
         }
     )
-
-    return grid_search.best_params_, res
+    if best:
+        return grid_search.best_params_, res
+    # if we don't ask for the best, compute a pick probability for each combination of params
+    min_bic = res["BIC"].min()
+    # compute the probability as a Gaussian distribution
+    res["pick_prob"] = np.exp(-pow(res["BIC"], 2.0) / pow(min_bic, 2.0))
+    res["pick_prob"] = res["pick_prob"] / res["pick_prob"].sum()
+    # and draw a combination based on this probability
+    good_params = res.sample(n=1, weights="pick_prob")
+    logging.info("Picked %s", good_params)
+    return good_params.to_dict("records")[0], res
 
 
 def compute_posteriors(morphs_df, source, gmm, source_region_id):
@@ -116,6 +127,7 @@ def run_classification(config):
         + config["morphologies"]["hierarchy_level"]
         + ".csv"
     )
+    makedirs(config["output"]["path"] + "/grid_search", exist_ok=True)
     # load feature data containing source region ("source") and number of terminals
     # in each target region ("<region_acronym>")
     f = pd.read_csv(data_path)
@@ -180,14 +192,19 @@ def run_classification(config):
         data = np.array(f_as.iloc[:, 3:].values.tolist())
 
         # we allow at most to have n_max_components classes
-        n_max_components = int(n_rows / 2.0)
+        # set an arbitrary limit to 20 classes in any case
+        n_max_components = min(int(n_rows / 2.0), 20)
+        # search for parameters combinations that give a good BIC score
+        good_params, grid_search_res = find_good_gmm(
+            data, n_max_components, best=False, seed=seed, n_jobs=n_jobs
+        )
+        grid_search_res.to_markdown(
+            config["output"]["path"] + "grid_search/" + s_a.replace("/", "-") + ".md"
+        )
+        logging.info(good_params)
 
-        best_params, _ = find_best_gmm(data, n_max_components, seed=seed, n_jobs=n_jobs)
-        # grid_search_res.to_markdown("grid_search_"+s_a+".md")
-        logging.info(best_params)
-        # TODO choose number of components and cov_type stochastically?
-        n_components = best_params["n_components"]
-        cov_type = best_params["covariance_type"]
+        n_components = good_params["n_components"]
+        cov_type = good_params["covariance_type"]
 
         # we take at most n_components components for the mixture, but since it is a BayesianGM,
         # it should use the optimal number of components <= n_components

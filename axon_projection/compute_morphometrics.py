@@ -210,7 +210,6 @@ def compare_morphometrics(config):
     )
 
 
-# TODO instead, assign random classification?
 def compare_morphometrics_all(config):
     """Compares morphometrics of all morphologies, with a cross-validation strategy.
 

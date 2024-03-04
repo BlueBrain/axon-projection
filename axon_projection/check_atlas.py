@@ -162,7 +162,6 @@ def compare_source_regions(config):
 
     df_cmp.to_markdown(output_path + "compare_regions.md")
 
-    # TODO compute a percent match at a coarser granularity to see if we're totally off.
     # we assume that the manual source is always at a lower (closer to root) level of hierarchy
     # because the source from atlas's hierarchy level can be specified by the user in the config
     if manual_path:

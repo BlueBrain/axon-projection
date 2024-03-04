@@ -444,7 +444,6 @@ def compute_tuft_properties(config):
 
     # build tufts dataframe
     tufts_df = pd.DataFrame(all_tufts)
-    # TODO get rid of that when everything works
     # tufts_df.to_csv(out_path+"tufts_df.csv")
     # # tufts_df = pd.read_csv(
     # #     out_path + "tufts_df.csv",
@@ -612,8 +611,6 @@ def compute_trunk_properties(config, tufts_df):
 
     terminals_df = pd.read_csv(out_path + "terminals.csv")
     list_morphs = terminals_df.morph_path.unique()
-
-    # TODO add brain region id
 
     morphio.set_maximum_warnings(1)
 
