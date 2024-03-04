@@ -17,7 +17,7 @@ def gmm_bic_score(estimator, data):
 
 
 # Need to disable "unsubpscriptable object" error with pylint, this is a bug from their side
-# pylint: disable=unsubscriptable-object
+# pylint: disable=unsubscriptable-object,unsupported-assignment-operation
 def find_good_gmm(data, n_components_max, seed=None, best=False, n_jobs=12):
     """Finds a good number of components and variance type for a GMM on the given data.
 
