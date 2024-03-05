@@ -10,6 +10,10 @@ Parameters for each step can be configured in a `.cfg` file, called at execution
 python axonal_projections.py config_ML.cfg
 ```
 
+|<p align="center"><img src="./docs/APWorkflow.png" alt="Axonal projection workflow" width="80%" height="auto"></p>|
+|:---:|
+| *Overview of the workflow. LRA : Long-range axon.* |
+
 These steps are executed in the following order:
 - **axonal_projections.py**: creates a table that contains source region and number of terminals in each targeted regions, for every provided morphology. Hierarchy level of source and target regions can be controlled in the configuration file (the higher the level, the deeper into regions).
 - **check_atlas.py** (optional): compares source regions found for the morphologies in the provided atlas, with source regions found elsewhere, typically from another atlas or manually assigned. Also checks the discrepancies between targeted regions for each morphology (*n.b.*: morphologies files tested should be the same and at the same disk location).
