@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+
 # pylint: disable=eval-used
 def sort_columns_by_region(df, region_names_df):
     """Sort the columns of the dataframe by the hierarchy given in region names."""
@@ -16,9 +17,7 @@ def sort_columns_by_region(df, region_names_df):
 
     def sort_hierarchy(col):
         # invert the hierarchy to go from coarse to fine
-        descending_hierarchy = eval(
-            region_names_df.loc[col]["acronyms"]
-        )
+        descending_hierarchy = eval(region_names_df.loc[col]["acronyms"])
         descending_hierarchy.reverse()
         return descending_hierarchy
 
@@ -27,6 +26,7 @@ def sort_columns_by_region(df, region_names_df):
     # sort the columns of df as cols_to_sort, and keep source and class_assignment as before
     df_out = df[["source", "class_assignment"] + sorted_cols]
     return df_out
+
 
 # pylint: disable=eval-used, cell-var-from-loop
 def plot_clusters(config):
