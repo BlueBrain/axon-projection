@@ -32,14 +32,14 @@ def create_tuft_morphology(morph, tuft_nodes_ids, common_ancestor, common_path_,
     tuft_morph = morph
     try:
         tuft_ancestor = tuft_morph.section(common_ancestor)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logging.warning(
-            "Common ancestor not found, trying with graph nodes representation.", repr(e)
+            "Common ancestor not found, trying with graph nodes representation. [%s]", repr(e)
         )
         try:
             tuft_ancestor = tuft_morph.section(tuft_nodes_ids[common_ancestor])
-        except Exception as e:
-            logging.warning("Common ancestor not found.", repr(e))
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            logging.warning("Common ancestor not found. [%s]", repr(ex))
             return None, None
 
     if len(tuft_nodes_ids) == 1:

@@ -96,6 +96,7 @@ def find_nodes_between(A, B, asc_table):
     return nodes_to_cross
 
 
+# pylint: disable=too-many-branches
 def create_conn_graphs(config, verify=False):
     """Create the connectivity graph for each class, for visualization purposes.
 
