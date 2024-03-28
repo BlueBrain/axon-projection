@@ -94,7 +94,7 @@ def compute_match_at_hierarchical_dist(df_cmp, hierarchy_col, dist, out_path):
     df_mismatch.rename(
         columns={
             "source": "source_from_atlas",
-            "source_from_atlas": "soruce_from_atlas_label",
+            "source_from_atlas": "source_from_atlas_label",
             "manual_source": "registered_source",
         },
         inplace=True,

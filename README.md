@@ -36,8 +36,21 @@ The output of this step, is the creation of classes for each source region, defi
 
 ## Installation
 
-TODO: Replace this text by proper installation instructions.
+First, create a virtual environment with at least python 3.8, and activate it:
+```bash
+python -m venv venvAP
+source venvAP/bin/activate
+```
 
+Clone this repository:
+```bash
+git clone https://bbpgitlab.epfl.ch/neuromath/user/petkantc/axon-projection.git
+```
+
+And then install the package by running:
+```bash
+pip install --index-url https://bbpteam.epfl.ch/repository/devpi/simple -e .
+```
 
 ## Examples
 

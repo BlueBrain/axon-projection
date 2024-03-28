@@ -8,6 +8,7 @@ from axon_projection.axonal_projections import main as create_ap_table
 from axon_projection.check_atlas import compare_axonal_projections
 from axon_projection.check_atlas import compare_source_regions
 from axon_projection.classify_axons import run_classification as classify_axons
+from axon_projection.plot_results import plot_clusters
 from axon_projection.sample_axon import main as sample_axon
 from axon_projection.separate_tufts import compute_morph_properties
 from axon_projection.visualize_connections import create_conn_graphs
@@ -40,10 +41,16 @@ if __name__ == "__main__":
     # compute tuft properties and give them a representativity score
     compute_morph_properties(config)
 
-    # sample an axon's tufts, given a source region
-    picked_tufts_df = sample_axon(config, config["sample_axon"]["source_region"])
+    # plot the results
+    plot_clusters(config)
 
-    logging.info("Picked tufts : %s", picked_tufts_df)
+    if config["validation"]["verify_classification"] == "True":
+        # sample as many axons as we had in the original dataset for the given source region
+        sample_axon(config, config["sample_axon"]["source_region"], with_tufts=True, n=1000)
+        # run the classification again on generate samples for verification
+        classify_axons(config, verify=True)
+        # and plot the graphs again
+        create_conn_graphs(config, verify=True)
 
     run_time = time.time() - start_time
     logging.info(

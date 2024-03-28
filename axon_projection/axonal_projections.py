@@ -123,7 +123,11 @@ def create_ap_table(
             source_region = get_region_at_level(source_asc, hierarchy_level)
             source_region_id = region_map.find(source_region, "acronym").pop()
             if source_region not in region_names:
-                region_names[source_region] = [source_region_id, source_asc, source_names]
+                region_names[source_region] = [
+                    source_region_id,
+                    source_asc[-hierarchy_level - 1 :],
+                    source_names[-hierarchy_level - 1 :],
+                ]
         except Exception as e:  # pylint: disable=broad-except
             if "Region ID not found" in repr(e) or "Out" in repr(e):
                 logging.warning("Source region could not be found.")
@@ -191,8 +195,12 @@ def create_ap_table(
                 if acronym_at_level not in region_names:
                     region_names[acronym_at_level] = [
                         region_map.get(brain_reg_voxels, "id", with_ascendants=False),
-                        region_map.get(brain_reg_voxels, "acronym", with_ascendants=True),
-                        region_map.get(brain_reg_voxels, "name", with_ascendants=True),
+                        region_map.get(brain_reg_voxels, "acronym", with_ascendants=True)[
+                            -hierarchy_level - 1 :
+                        ],
+                        region_map.get(brain_reg_voxels, "name", with_ascendants=True)[
+                            -hierarchy_level - 1 :
+                        ],
                     ]
                 # finally, store this terminal for the tufts clustering
                 rows_terminals.append(

@@ -96,7 +96,7 @@ def find_nodes_between(A, B, asc_table):
     return nodes_to_cross
 
 
-def create_conn_graphs(config):
+def create_conn_graphs(config, verify=False):
     """Create the connectivity graph for each class, for visualization purposes.
 
     Inputs:
@@ -110,11 +110,15 @@ def create_conn_graphs(config):
             Blue: intermediary nodes;
             Number label: connectivity strength, or connection probability.
     """
-    output_path = config["output"]["path"] + "conn_graphs/"
+    if not verify:
+        output_path = config["output"]["path"] + "conn_graphs/"
+        # file that contains the connection probabilities for each source region and each class
+        conn_data_path = config["output"]["path"] + "conn_probs.csv"
+    else:
+        output_path = config["output"]["path"] + "verify_GMM/conn_graphs/"
+        conn_data_path = config["output"]["path"] + "verify_GMM/conn_probs.csv"
     os.makedirs(output_path, exist_ok=True)
 
-    # file that contains the connection probabilities for each source region and each class
-    conn_data_path = config["output"]["path"] + "conn_probs.csv"
     atlas_path = config["atlas"]["path"]
     atlas_regions = config["atlas"]["regions"]
     atlas_hierarchy = config["atlas"]["hierarchy"]
@@ -238,4 +242,4 @@ if __name__ == "__main__":
     config_ = configparser.ConfigParser()
     config_.read(sys.argv[1])
 
-    create_conn_graphs(config_)
+    create_conn_graphs(config_, config_["validation"]["verify_classification"] == "True")

@@ -30,7 +30,17 @@ from axon_projection.plot_utils import plot_tuft
 def create_tuft_morphology(morph, tuft_nodes_ids, common_ancestor, common_path_, shortest_paths):
     """Create a new morphology containing only the given tuft."""
     tuft_morph = morph
-    tuft_ancestor = tuft_morph.section(common_ancestor)
+    try:
+        tuft_ancestor = tuft_morph.section(common_ancestor)
+    except Exception as e:
+        logging.warning(
+            "Common ancestor not found, trying with graph nodes representation.", repr(e)
+        )
+        try:
+            tuft_ancestor = tuft_morph.section(tuft_nodes_ids[common_ancestor])
+        except Exception as e:
+            logging.warning("Common ancestor not found.", repr(e))
+            return None, None
 
     if len(tuft_nodes_ids) == 1:
         for sec in tuft_morph.sections:
@@ -162,6 +172,10 @@ def separate_tuft(
         shortest_path,
     )
 
+    if tuft_morph is None:
+        logging.info("No tuft created for %s", tuft)
+        return
+
     # resize root section
     # Compute the tuft center
     tuft_center = np.mean(tuft_morph.points, axis=0)
@@ -183,8 +197,9 @@ def separate_tuft(
     )
     # Export the tuft
     export_tuft_path = Path(out_path_tufts) / morph_name
-    export_tuft_morph_path = export_tuft_path / f"{target.replace('/','-')}.asc"
+    export_tuft_morph_path = export_tuft_path / f"{target.replace('/','-')}.swc"
     # write the tuft_morph file
+    tuft_morph._morphio_morph.remove_unifurcations()
     tuft_morph._morphio_morph.write(export_tuft_morph_path)
     logging.debug("Written tuft %s to %s.", tuft, export_tuft_morph_path)
     #  that will populate tufts dataframe
@@ -584,8 +599,9 @@ def separate_trunk(
     # save/plot it
     morph_name = f"{Path(morph_file).with_suffix('').name.replace('/','-')}"
     export_trunk_path = Path(out_path_trunks) / morph_name
-    export_trunk_morph_path = export_trunk_path / f"trunk_{axon_id}.asc"
+    export_trunk_morph_path = export_trunk_path / f"trunk_{axon_id}.swc"
     # write the trunk morph file
+    trunk_morph._morphio_morph.remove_unifurcations()
     trunk_morph._morphio_morph.write(export_trunk_morph_path)
     logging.debug("Written trunk %s to %s.", trunk, export_trunk_morph_path)
     #  that will populate tufts dataframe
@@ -602,7 +618,7 @@ def separate_trunk(
 def compute_trunk_properties(config, tufts_df):
     """Launches in parallel the separation of trunks and computation of their properties."""
     out_path = config["output"]["path"]
-    plot_debug = config["separate_tufts"]["plot_debug"].lower() == "true"
+    plot_debug = config["separate_tufts"]["plot_debug"] == "True"
     terminals_df = pd.read_csv(out_path + "terminals.csv")
     out_path_trunks = out_path + "trunks"
     features_str = config["separate_tufts"]["trunk_morphometrics"]
