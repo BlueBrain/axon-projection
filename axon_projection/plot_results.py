@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-
+# pylint: disable=eval-used
 def sort_columns_by_region(df, region_names_df):
     """Sort the columns of the dataframe by the hierarchy given in region names."""
     # get the column names from df into a list
@@ -18,7 +18,7 @@ def sort_columns_by_region(df, region_names_df):
         # invert the hierarchy to go from coarse to fine
         descending_hierarchy = eval(
             region_names_df.loc[col]["acronyms"]
-        )  # pylint: disable=eval-used
+        )
         descending_hierarchy.reverse()
         return descending_hierarchy
 
@@ -28,7 +28,7 @@ def sort_columns_by_region(df, region_names_df):
     df_out = df[["source", "class_assignment"] + sorted_cols]
     return df_out
 
-
+# pylint: disable=eval-used, cell-var-from-loop
 def plot_clusters(config):
     """Plots the GMM clusters as a clustermap for each source region."""
     output_dir = config["output"]["path"]
@@ -101,17 +101,17 @@ def plot_clusters(config):
             # -1 because first acronym is the leaf
             regions_at_i = region_names_df[
                 region_names_df["acronyms"].apply(lambda x: len(eval(x)) - 1 >= i)
-            ]  # pylint: disable=eval-used,cell-var-from-loop
+            ]
             # create a column with the acronym at the ith (from the end) position in the list
             # for each row in the regions table
             regions_at_i["level_" + str(i)] = regions_at_i["acronyms"].apply(
                 lambda x: eval(x)[-i - 1]
-            )  # pylint: disable=eval-used,cell-var-from-loop
+            )
             # take the acronym at ith position starting from the end of the list for each row,
             # and make a set from these
             acronyms_at_i = set(
                 sorted(list(regions_at_i["acronyms"].apply(lambda x: eval(x)[-i - 1])))
-            )  # pylint: disable=eval-used,cell-var-from-loop
+            )
             # create a color palette for these regions
             regions_palette = sns.palettes.color_palette("hls", len(acronyms_at_i))
             # map the regions to the palette
