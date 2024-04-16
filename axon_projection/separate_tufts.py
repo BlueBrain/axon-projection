@@ -719,7 +719,7 @@ def compute_clustered_tufts_scores(config):
     tufts_props_path = axon_synth_clustering_path + "tuft_properties.json"
     out_path = config["output"]["path"]
 
-    tufts_df = pd.read_json(tufts_props_path)
+    tufts_df = pd.read_json(tufts_props_path)  # pylint: disable=no-member
 
     # do some relevant transformations on tufts_df to prepare it for compute_rep_score
     # put the same target to everyone, so that we skip the target filtration,
