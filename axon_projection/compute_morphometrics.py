@@ -68,8 +68,7 @@ def compute_stats_parallel(morphometrics, pop, neurite_type=nm.AXON):
 def compute_stats_cv(
     morph_file,
     list_other_morphs,
-    source,
-    cl,
+    pop_id,
     morphometrics,
     res_queue,
     morphs_as_paths=True,
@@ -91,7 +90,7 @@ def compute_stats_cv(
     else:
         morph = morph_file
         other_morphs = list_other_morphs
-    dict_rows.update({"source_region": source, "assigned_class": cl})
+    dict_rows.update({"population_id": pop_id})
     stats_morph = None
     stats_other_morphs = None
     if in_parallel:

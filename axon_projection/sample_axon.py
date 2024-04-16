@@ -24,6 +24,7 @@ def load_gmm(source_region, params_file):
     gmm.weights_ = gmm_df["probability"].values
     means = np.array([ast.literal_eval(item) for item in gmm_df["means"].values])
     gmm.means_ = means
+    # variances can be either single values (spherical) or lists (other)
     try:
         variances = np.array([ast.literal_eval(item) for item in gmm_df["variances"].values])
     except Exception as e:  # pylint: disable=broad-except
@@ -155,33 +156,56 @@ def pick_tufts(axonal_projections_df, source, tufts_file, output_path=None):
     return picked_tufts_df
 
 
-def main(config, source, n=1000, with_tufts=True):
+def main(config, with_tufts=False):
     """A function to sample an axon's terminals for the given source and select tufts for it.
 
     Args:
         config (dict): A dictionary containing configuration parameters.
-        source: The given source region.
-        n: The number of axons to sample.
         with_tufts: Whether to select tufts for the sampled axons.
 
     Outputs:
         axons_terms: The DataFrame containing the sampled axon's terminals for the given
-        source region.
+        source regions.
         picked_tufts_df: The DataFrame containing the picked tufts for the sampled axon.
     """
-    # first sample an axon's terminal points for the given source region
-    axons_terms = sample_axon(
-        source, config["sample_axon"]["params_file"], config["sample_axon"]["regions_file"], n
-    )
-    axons_terms.to_csv(config["output"]["path"] + "axonal_projections_sampled.csv")
-
-    if with_tufts:
-        # and then select tufts for it accordingly
-        picked_tufts_df = pick_tufts(
-            axons_terms, source, config["sample_axon"]["tufts_file"], config["output"]["path"]
+    n = ast.literal_eval(config["sample_axon"]["n_samples"])
+    sources = ast.literal_eval(config["sample_axon"]["source_regions"])
+    if sources == "*":
+        sources = pd.read_csv(config["sample_axon"]["params_file"])["source"].unique()
+    logging.debug("Sampling for sources : %s", sources)
+    axons_terms = pd.DataFrame()
+    for source in sources:
+        # first sample an axon's terminal points for the given source region
+        # and concatenate them in the axons_terms df
+        axons_terms = pd.concat(
+            [
+                axons_terms,
+                sample_axon(
+                    source,
+                    config["sample_axon"]["params_file"],
+                    config["sample_axon"]["regions_file"],
+                    n,
+                ),
+            ],
+            ignore_index=True,
         )
 
-        picked_tufts_df.to_csv(config["output"]["path"] + "picked_tufts.csv")
+        if with_tufts:
+            # and then select tufts for it accordingly
+            picked_tufts_df = pick_tufts(
+                axons_terms, source, config["sample_axon"]["tufts_file"], config["output"]["path"]
+            )
+
+            picked_tufts_df.to_csv(
+                config["output"]["path"] + source.replace("/", "-") + "_picked_tufts.csv"
+            )
+
+    axons_terms.to_csv(
+        config["output"]["path"]
+        + "verify_GMM/axonal_projections_"
+        + config["morphologies"]["hierarchy_level"]
+        + ".csv"
+    )
 
 
 if __name__ == "__main__":
@@ -191,4 +215,4 @@ if __name__ == "__main__":
     config_ = configparser.ConfigParser()
     config_.read(sys.argv[1])
 
-    main(config_, config_["sample_axon"]["source_region"], with_tufts=False)
+    main(config_, with_tufts=False)

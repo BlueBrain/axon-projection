@@ -269,7 +269,7 @@ def compute_rep_score(tufts_df, morphometrics):
     """
     logging.info("Computing representativity scores...")
     res = []
-    sources = tufts_df.source.unique()
+    pop_ids = tufts_df.population_id.unique()
 
     with Manager() as manager:
         res_queue = manager.Queue()
@@ -277,55 +277,49 @@ def compute_rep_score(tufts_df, morphometrics):
         with Pool() as pool:
             # list of arguments for the processes to launch
             args_list = []
-            # for every source region of a tuft (position of the soma)
-            for source in sources:
-                df_same_source = tufts_df[tufts_df["source"] == source]
-                classes = df_same_source.class_assignment.unique()
-                # for every class defined for this source region
-                for cl in classes:
-                    df_same_class = df_same_source[df_same_source["class_assignment"] == cl]
-                    for group_name, group in df_same_class.groupby("target"):
-                        # if there is only one point in that class, with same target, there
-                        # is nothing to compare
-                        if len(group) < 2:
+            # for every source region (position of the soma) + class (= pop_id) of a tuft
+            for pop_id in pop_ids:
+                df_same_pop = tufts_df[tufts_df["population_id"] == pop_id]
+                for group_name, group in df_same_pop.groupby("target"):
+                    # if there is only one point in that class, with same target, there
+                    # is nothing to compare
+                    if len(group) < 2:
+                        logging.debug(
+                            "Skipping target %s of population %s "
+                            + "with %s tuft(s) data point(s).",
+                            group_name,
+                            pop_id,
+                            len(group),
+                        )
+                        continue
+                    # for every tuft, compute the representativity score
+                    for index, tuft_row in group.iterrows():
+                        logging.debug("Computing rep_score for tuft in %s.", tuft_row["target"])
+                        # if n_terms is 1, we can't compute the morphometrics
+                        if tuft_row["n_terms"] < 2:
                             logging.debug(
-                                "Skipping target %s of class %s of source %s "
-                                + "with %s tuft(s) data point(s).",
-                                group_name,
-                                cl,
-                                source,
-                                len(group),
+                                "Skipping tuft in target region %s with %s terminal(s).",
+                                tuft_row["target"],
+                                tuft_row["n_terms"],
                             )
                             continue
-                        # for every tuft, compute the representativity score
-                        for index, tuft_row in group.iterrows():
-                            logging.debug("Computing rep_score for tuft in %s.", tuft_row["target"])
-                            # if n_terms is 1, we can't compute the morphometrics
-                            if tuft_row["n_terms"] < 2:
-                                logging.debug(
-                                    "Skipping tuft in target region %s with %s terminal(s).",
-                                    tuft_row["target"],
-                                    tuft_row["n_terms"],
-                                )
-                                continue
-                            tuft = tuft_row["tuft_morph"]
-                            df_other_tufts = group[(group["tuft_morph"] != tuft)]
-                            # filter the list of other tufts than the current one
-                            # (within the same class)
-                            list_other_tufts = df_other_tufts["tuft_morph"].values.tolist()
-                            # and finally compute the score in parallel
-                            args = (
-                                tuft,
-                                list_other_tufts,
-                                source,
-                                cl,
-                                morphometrics,
-                                res_queue,
-                                True,
-                                index,
-                                False,
-                            )
-                            args_list.append(args)
+                        tuft = tuft_row["tuft_morph"]
+                        df_other_tufts = group[(group["tuft_morph"] != tuft)]
+                        # filter the list of other tufts than the current one
+                        # (within the same class)
+                        list_other_tufts = df_other_tufts["tuft_morph"].values.tolist()
+                        # and finally compute the score in parallel
+                        args = (
+                            tuft,
+                            list_other_tufts,
+                            pop_id,
+                            morphometrics,
+                            res_queue,
+                            True,
+                            index,
+                            False,
+                        )
+                        args_list.append(args)
             pool.starmap(compute_stats_cv, args_list)
 
         while not res_queue.empty():
@@ -715,6 +709,62 @@ def compute_morph_properties(config):
     # keep only columns that are useful for the trunks computation
     tufts_df = tufts_df[["morph_path", "axon_id", "common_ancestor_node_id"]]
     compute_trunk_properties(config, tufts_df)
+
+
+def compute_clustered_tufts_scores(config):
+    """Compute pre-clustered tuft rep scores using the given configuration."""
+    axon_synth_clustering_path = (
+        "/gpfs/bbp.cscs.ch/project/proj82/home/petkantc/sims/mimic_ML_PRE/inputs/Clustering/"
+    )
+    tufts_props_path = axon_synth_clustering_path + "tuft_properties.json"
+    out_path = config["output"]["path"]
+
+    tufts_df = pd.read_json(tufts_props_path)
+
+    # do some relevant transformations on tufts_df to prepare it for compute_rep_score
+    # put the same target to everyone, so that we skip the target filtration,
+    # which is not relevant when not clustering based on target regions
+    tufts_df["target"] = 0
+    # rename the "size" col to "n_terms"
+    tufts_df.rename(columns={"size": "n_terms"}, inplace=True)
+    # create "tuft_morph" col from "morphology"_"config_name"_"axon_id"_"tuft_id"
+    tufts_df["tuft_morph"] = (
+        axon_synth_clustering_path
+        + "tuft_morphologies/"
+        + tufts_df["morphology"].astype(str)
+        + "_"
+        + tufts_df["config_name"].astype(str)
+        + "_"
+        + tufts_df["axon_id"].astype(str)
+        + "_"
+        + tufts_df["tuft_id"].astype(str)
+        + ".asc"
+    )
+
+    # replace the population id with the ones given by the morphs clustering in posteriors
+    posteriors_df = pd.read_csv(out_path + "posteriors.csv", index_col=0)
+    # replace the population_id column with the value in posteriors_df,
+    # joining the dfs using the morph_path
+    tufts_df["population_id"] = tufts_df["morph_file"].map(
+        posteriors_df.set_index("morph_path")["population_id"]
+    )
+
+    # compute scores
+    # list of morphometrics features to compute
+    features_str = config["compare_morphometrics"]["features"]
+    morphometrics = [feature.strip() for feature in features_str.split(",")]
+    # compute tufts representativity score, and update the df with it
+    tufts_df = compute_rep_score(tufts_df, morphometrics)
+
+    # (optional) do some post-processing on the df
+    tufts_df.rename(columns={"n_terms": "size", "rep_score": "weight"}, inplace=True)
+    tufts_df.drop(columns=["target"], inplace=True)
+
+    # output the tufts_df updated with the scores
+    with pathlib.Path(out_path + "tufts_properties_scores.json").open(
+        mode="w", encoding="utf-8"
+    ) as f:
+        json.dump(tufts_df.to_dict("records"), f, indent=4)
 
 
 if __name__ == "__main__":

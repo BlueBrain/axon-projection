@@ -29,9 +29,13 @@ def sort_columns_by_region(df, region_names_df):
 
 
 # pylint: disable=eval-used, cell-var-from-loop
-def plot_clusters(config):
+def plot_clusters(config, verify=False):
     """Plots the GMM clusters as a clustermap for each source region."""
-    output_dir = config["output"]["path"]
+    if not verify:
+        output_dir = config["output"]["path"]
+    else:
+        output_dir = config["output"]["path"] + "verify_GMM/"
+
     makedirs(output_dir + "plots/", exist_ok=True)
 
     # get the axonal projection data
@@ -39,27 +43,33 @@ def plot_clusters(config):
         output_dir + "axonal_projections_" + config["morphologies"]["hierarchy_level"] + ".csv",
         index_col="morph_path",
     )
-
-    # get the posterior class assignment of each morph
-    df_post = pd.read_csv(output_dir + "posteriors.csv", index_col="morph_path")
-
-    # merge the two dfs on the morph_path
-    ap_table = ap_table.merge(df_post, on="morph_path")
-    ap_table.drop(
-        [
-            "Unnamed: 0_x",
-            "Unnamed: 0_y",
-            "source_region",
-            "probabilities",
-            "population_id",
-            "log_likelihood",
-        ],
-        axis=1,
-        inplace=True,
-    )
+    reuse_clusters = config["validation"]["reuse_clusters"] == "True"
+    if not verify or (verify and not reuse_clusters):
+        # get the posterior class assignment of each morph
+        df_post = pd.read_csv(output_dir + "posteriors.csv", index_col="morph_path")
+        # merge the two dfs on the morph_path
+        ap_table = ap_table.merge(df_post, on="morph_path")
+        ap_table.drop(
+            [
+                "Unnamed: 0_x",
+                "Unnamed: 0_y",
+                "source_region",
+                "probabilities",
+                "population_id",
+                "log_likelihood",
+            ],
+            axis=1,
+            inplace=True,
+        )
+    elif verify:
+        # rename the class_id column into class_assignment if we are reusing the clusters
+        ap_table.rename(columns={"class_id": "class_assignment"}, inplace=True)
+        if "Unnamed: 0" in ap_table.columns:
+            ap_table.drop("Unnamed: 0", axis=1, inplace=True)
 
     # Load the hierarchical information for targets
-    region_names_df = pd.read_csv(output_dir + "region_names_df.csv", index_col=0)
+    # keep config["output"]["path"] here instead of output_dir because we don't output names twice
+    region_names_df = pd.read_csv(config["output"]["path"] + "region_names_df.csv", index_col=0)
     region_names_df.drop(["id", "names"], axis=1, inplace=True)
 
     # get the list of target regions, without the "morph_path", index and class_assignment columns
@@ -116,13 +126,12 @@ def plot_clusters(config):
             regions_palette = sns.palettes.color_palette("hls", len(acronyms_at_i))
             # map the regions to the palette
             regions_map = dict(zip(acronyms_at_i, regions_palette[: len(acronyms_at_i)]))
-            print(regions_map)
+            # print(regions_map)
             regions_color_dict.update(
                 {"level_" + str(i): regions_at_i["level_" + str(i)].map(regions_map)}
             )
             # number of parents determines in which color strip we should plot each target
             # plot only the color strips if target region is at current level
-            # then sort the data hierarchy_level times by adjusting towards the root
             # print(parent_region)
         regions_colors = pd.DataFrame(regions_color_dict)
         # invert the order of the columns to have "root" on the top
@@ -136,7 +145,7 @@ def plot_clusters(config):
         sns.clustermap(
             group.transpose(),
             mask=(group.transpose() <= 1e-16),
-            cmap="viridis",
+            cmap="Blues",
             yticklabels=True,
             xticklabels=False,
             cbar_kws={"label": "Terminals"},
@@ -145,9 +154,9 @@ def plot_clusters(config):
             row_cluster=False,
             col_cluster=False,
             figsize=(len(group) + 20, len(group.columns)),
-        )  # , cbar_pos=(.05, .03, .03, .6))
+        )  # cbar_pos=(.05, .03, .03, .6))
         plt.title(source)
-        plt.savefig(output_dir + "plots/" + source.replace("/", "-") + "_clustermap.png")
+        plt.savefig(output_dir + "plots/" + source.replace("/", "-") + "_clustermap.pdf")
         plt.close()
 
 

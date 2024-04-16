@@ -131,12 +131,12 @@ def run_classification(config, verify=False):
     """
     if not verify:
         out_path = config["output"]["path"]
-        data_path = (
-            out_path + "axonal_projections_" + config["morphologies"]["hierarchy_level"] + ".csv"
-        )
     else:
         out_path = config["output"]["path"] + "verify_GMM/"
-        data_path = config["output"]["path"] + "axonal_projections_sampled.csv"
+
+    data_path = (
+        out_path + "axonal_projections_" + config["morphologies"]["hierarchy_level"] + ".csv"
+    )
     makedirs(out_path + "/grid_search", exist_ok=True)
     # load feature data containing source region ("source") and number of terminals
     # in each target region ("<region_acronym>")
