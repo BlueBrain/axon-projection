@@ -90,11 +90,11 @@ if __name__ == "__main__":
     log_format = "%(asctime)s [%(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
     logging.basicConfig(level=logging.INFO, format=log_format, force=True)
 
-    config = configparser.ConfigParser()
-    config.read(sys.argv[1])
+    config_ = configparser.ConfigParser()
+    config_.read(sys.argv[1])
 
     # full_workflow(config)
-    hybrid_workflow(config)
+    hybrid_workflow(config_)
 
     run_time = time.time() - start_time
     logging.info(
