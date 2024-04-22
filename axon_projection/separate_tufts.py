@@ -719,14 +719,14 @@ def compute_clustered_tufts_scores(config):
     tufts_props_path = axon_synth_clustering_path + "tuft_properties.json"
     out_path = config["output"]["path"]
 
-    tufts_df = pd.read_json(tufts_props_path)  # pylint: disable=no-member
+    tufts_df = pd.read_json(tufts_props_path)
 
     # do some relevant transformations on tufts_df to prepare it for compute_rep_score
     # put the same target to everyone, so that we skip the target filtration,
     # which is not relevant when not clustering based on target regions
     tufts_df["target"] = 0
     # rename the "size" col to "n_terms"
-    tufts_df.rename(columns={"size": "n_terms"}, inplace=True)
+    tufts_df.rename(columns={"size": "n_terms"}, inplace=True)  # pylint: disable=no-member
     # create "tuft_morph" col from "morphology"_"config_name"_"axon_id"_"tuft_id"
     tufts_df["tuft_morph"] = (
         axon_synth_clustering_path
