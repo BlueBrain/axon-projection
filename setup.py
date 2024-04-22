@@ -30,6 +30,7 @@ reqs = [
 ]
 
 doc_reqs = [
+    "docutils<0.21",
     "m2r2",
     "sphinx",
     "sphinx-bluebrain-theme",
