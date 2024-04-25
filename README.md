@@ -47,7 +47,7 @@ Clone this repository:
 git clone https://bbpgitlab.epfl.ch/neuromath/user/petkantc/axon-projection.git
 ```
 
-And then install the package by running:
+And then install the package by running at the `setup.py` location:
 ```bash
 pip install --index-url https://bbpteam.epfl.ch/repository/devpi/simple -e .
 ```

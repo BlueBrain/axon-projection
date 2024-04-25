@@ -119,7 +119,7 @@ def run_classification(config, verify=False):
     """Creates the projectional classes for each source region.
 
     Inputs:
-        Needs a file 'axonal_projections.csv' that contains the feature data for classification.
+        Needs a file 'axon_{terminals|lengths}.csv' that contains feature data for classification.
         verify (bool) : if True, the clustering is run on data that was generated with the GMM.
 
     Outputs:
@@ -135,7 +135,11 @@ def run_classification(config, verify=False):
         out_path = config["output"]["path"] + "verify_GMM/"
 
     data_path = (
-        out_path + "axonal_projections_" + config["morphologies"]["hierarchy_level"] + ".csv"
+        out_path
+        + config["classify"]["feature_vectors_file"]
+        + "_"
+        + config["morphologies"]["hierarchy_level"]
+        + ".csv"
     )
     makedirs(out_path + "/grid_search", exist_ok=True)
     # load feature data containing source region ("source") and number of terminals

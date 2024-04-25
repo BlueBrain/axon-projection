@@ -1,12 +1,72 @@
 """Functions to plot the results of the classification."""
 import ast
 import configparser
+import logging
 import sys
 from os import makedirs
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
+
+
+def compare_feature_vectors(config):
+    """Compares the possible feature vectors for clustering of the morphologies."""
+    makedirs(config["output"]["path"] + "plots/", exist_ok=True)
+
+    feature_vectors = ["axon_terminals", "axon_lengths"]
+    # create a figure with as many vertical subplots as there are feature vectors
+    fig, ax = plt.subplots(
+        len(feature_vectors) + 1, 1, figsize=(10, 10 * (len(feature_vectors) + 1)), sharex=True
+    )
+    feature_vec_df_0 = pd.Series()
+    for i, feature_vector in enumerate(feature_vectors):
+        # load the feature vector
+        feature_vec_df = pd.read_csv(
+            config["output"]["path"]
+            + feature_vector
+            + "_"
+            + config["morphologies"]["hierarchy_level"]
+            + ".csv",
+            index_col=0,
+        )
+        feature_vec_df.drop(["morph_path", "source"], axis=1, inplace=True)
+        # sum all the rows, but keep the columns
+        feature_vec_df = feature_vec_df.sum(axis=0)
+        # normalize the series
+        feature_vec_df = feature_vec_df / feature_vec_df.sum()
+
+        # if it is the first feature vector, save it for the diff plot
+        if i == 0:
+            feature_vec_df_0 = feature_vec_df
+        # if it is the second, plot the diff
+        elif i == 1:
+            feature_vec_df_diff = feature_vec_df_0 - feature_vec_df
+            ax[i + 1].bar(np.arange(len(feature_vec_df_diff)), feature_vec_df_diff.to_numpy())
+            ax[i + 1].set_title(
+                feature_vectors[0].split("_")[1] + " - " + feature_vectors[1].split("_")[1]
+            )
+            ax[i + 1].set_xticks(
+                np.arange(len(feature_vec_df)), labels=feature_vec_df.index.to_list(), rotation=90
+            )
+            # plot a horizontal line at 0
+            ax[i + 1].axhline(0, color="black")
+            ax[i + 1].set_ylim(
+                -np.max(np.abs(feature_vec_df_diff)) * 1.1,
+                np.max(np.abs(feature_vec_df_diff)) * 1.1,
+            )
+
+        # plot the feature vector as a barplot
+        ax[i].bar(np.arange(len(feature_vec_df)), feature_vec_df.to_numpy())
+        ax[i].set_title(feature_vector.split("_")[1] + " (normalized)")
+        ax[i].set_xticks(
+            np.arange(len(feature_vec_df)), labels=feature_vec_df.index.to_list(), rotation=90
+        )
+        ax[i].set_ylim(0, 1)
+    # save the fig
+    fig.savefig(config["output"]["path"] + "plots/compare_feature_vectors.pdf")
+    plt.close(fig)
 
 
 # pylint: disable=eval-used
@@ -40,9 +100,14 @@ def plot_clusters(config, verify=False):
 
     # get the axonal projection data
     ap_table = pd.read_csv(
-        output_dir + "axonal_projections_" + config["morphologies"]["hierarchy_level"] + ".csv",
+        output_dir
+        + config["classify"]["feature_vectors_file"]
+        + "_"
+        + config["morphologies"]["hierarchy_level"]
+        + ".csv",
         index_col="morph_path",
     )
+    feature_used = str(config["classify"]["feature_vectors_file"]).split("_")[1]
     reuse_clusters = config["validation"]["reuse_clusters"] == "True"
     if not verify or (verify and not reuse_clusters):
         # get the posterior class assignment of each morph
@@ -148,7 +213,7 @@ def plot_clusters(config, verify=False):
             cmap="Blues",
             yticklabels=True,
             xticklabels=False,
-            cbar_kws={"label": "Terminals"},
+            cbar_kws={"label": feature_used},
             col_colors=cluster_colors,
             row_colors=regions_colors,
             row_cluster=False,
@@ -160,10 +225,17 @@ def plot_clusters(config, verify=False):
         plt.close()
 
 
+def plot_results(config, verify=False):
+    """Plots all the results."""
+    if not verify:
+        compare_feature_vectors(config)
+    plot_clusters(config, verify)
+
+
 if __name__ == "__main__":
-    # logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
 
     config_ = configparser.ConfigParser()
     config_.read(sys.argv[1])
 
-    plot_clusters(config_)
+    plot_results(config_)

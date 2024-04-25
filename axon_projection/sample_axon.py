@@ -170,8 +170,11 @@ def main(config, with_tufts=False):
     """
     n = ast.literal_eval(config["sample_axon"]["n_samples"])
     sources = ast.literal_eval(config["sample_axon"]["source_regions"])
-    if sources == "*":
-        sources = pd.read_csv(config["sample_axon"]["params_file"])["source"].unique()
+    params_file = config["output"]["path"] + config["sample_axon"]["params_file"]
+    regions_file = config["output"]["path"] + config["sample_axon"]["regions_file"]
+    tufts_file = config["output"]["path"] + config["sample_axon"]["tufts_file"]
+    if sources == "*" or sources[0] == "*":
+        sources = pd.read_csv(params_file)["source"].unique()
     logging.debug("Sampling for sources : %s", sources)
     axons_terms = pd.DataFrame()
     for source in sources:
@@ -182,8 +185,8 @@ def main(config, with_tufts=False):
                 axons_terms,
                 sample_axon(
                     source,
-                    config["sample_axon"]["params_file"],
-                    config["sample_axon"]["regions_file"],
+                    params_file,
+                    regions_file,
                     n,
                 ),
             ],
@@ -192,9 +195,7 @@ def main(config, with_tufts=False):
 
         if with_tufts:
             # and then select tufts for it accordingly
-            picked_tufts_df = pick_tufts(
-                axons_terms, source, config["sample_axon"]["tufts_file"], config["output"]["path"]
-            )
+            picked_tufts_df = pick_tufts(axons_terms, source, tufts_file, config["output"]["path"])
 
             picked_tufts_df.to_csv(
                 config["output"]["path"] + source.replace("/", "-") + "_picked_tufts.csv"
@@ -202,7 +203,9 @@ def main(config, with_tufts=False):
 
     axons_terms.to_csv(
         config["output"]["path"]
-        + "verify_GMM/axonal_projections_"
+        + "verify_GMM/"
+        + config["classify"]["feature_vectors_file"]
+        + "_"
         + config["morphologies"]["hierarchy_level"]
         + ".csv"
     )

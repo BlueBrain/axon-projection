@@ -9,8 +9,12 @@ from collections import Counter
 import neurom as nm
 import numpy as np
 import pandas as pd
+from axon_synthesis.constants import FROM_COORDS_COLS
+from axon_synthesis.constants import TO_COORDS_COLS
+from axon_synthesis.utils import neurite_to_pts
 from neurom.core.morphology import Section
 from neurom.core.morphology import iter_sections
+from voxcell.exceptions import VoxcellError
 
 from axon_projection.choose_hierarchy_level import get_region_at_level
 from axon_projection.compute_morphometrics import get_axons
@@ -22,6 +26,117 @@ def basal_dendrite_filter(n):
     return n.type == nm.BASAL_DENDRITE
 
 
+def find_and_register_source_region(
+    morph, region_names, brain_regions, region_map, hierarchy_level
+):
+    """Finds and registers in region_names the region of the soma of the given morph.
+
+    Args:
+        morph (nm.Morphology): the morph to find the source region of.
+        region_names (dict): the dictionary that contains the region names of morphs so far.
+        brain_regions: the atlas brain regions object.
+        region_map: the atlas region map object.
+        hierarchy_level (int): the desired hierarchy level of brain regions.
+
+    Returns:
+        source_region (str): the acronym of the source region.
+        region_names (dict): the updated dictionary that contains the region names.
+    """
+    source_pos = morph.soma.center
+    # source_pos = morph.soma.get_center()
+    # if morph doesn't have a soma, take the average of the first points of
+    # each sections of basal dendrites as source pos
+    if source_pos is None or (isinstance(source_pos, list) and len(source_pos) == 0):
+        source_pos = np.mean(
+            [sec.points[0] for sec in iter_sections(morph, neurite_filter=basal_dendrite_filter)],
+            axis=0,
+        )[
+            0:3
+        ]  # exclude radius if it is present
+    logging.info("Found source position at %s", source_pos)
+
+    # get the source region
+    source_asc = region_map.get(brain_regions.lookup(source_pos), "acronym", with_ascendants=True)
+    source_names = region_map.get(brain_regions.lookup(source_pos), "name", with_ascendants=True)
+    # select the source region at the desired hierarchy level
+    source_region = get_region_at_level(source_asc, hierarchy_level)
+    source_region_id = region_map.find(source_region, "acronym").pop()
+    if source_region not in region_names:
+        region_names[source_region] = [
+            source_region_id,
+            source_asc[-hierarchy_level - 1 :],
+            source_names[-hierarchy_level - 1 :],
+        ]
+
+    return source_region, region_names
+
+
+def get_region(x, brain_regions, region_map, value="acronym", with_ascendants=False):
+    """Get the brain region name of the point x."""
+    reg = "OOB"
+    try:
+        reg = region_map.get(brain_regions.lookup(x), value, with_ascendants=with_ascendants)
+    except VoxcellError:
+        pass
+    except Exception as e:  # pylint: disable=broad-except
+        logging.debug("Unexpected error: %s", repr(e))
+    return reg
+
+
+def compute_length_in_regions(
+    morph, regions_targeted, brain_regions, region_map, dict_acronyms_at_level
+):
+    """Compute and returns the path length of the morph's axons in the targeted regions."""
+    lengths = {}
+    axons = get_axons(morph)
+    edges = pd.DataFrame()
+    for axon in axons:
+        # call neurite_to_pts with keep_section_segments=True on the axon
+        _nodes, edges_tmp = neurite_to_pts(axon, keep_section_segments=True, edges_with_coords=True)
+        edges = pd.concat([edges, edges_tmp])
+    # compute once the length of all edges
+    edges["length"] = np.linalg.norm(
+        edges[FROM_COORDS_COLS].to_numpy() - edges[TO_COORDS_COLS].to_numpy(),
+        axis=1,
+    )
+
+    # TODO might need to try-catch OOBs
+    # concatenate the three edges[FROM_COORDS_COLS] columns into a single column in a list
+    edges["source_coords"] = edges[FROM_COORDS_COLS].to_numpy().tolist()
+    # add the brain region of the source and target points of the segments, using the atlas lookup
+    edges["source_region"] = edges["source_coords"].apply(
+        lambda x: get_region(x, brain_regions, region_map)
+    )
+    # replace the acronym by the acronym at desired level:
+    # if it is not in the dict (which means that no terminal ends in that region),
+    # leave it as it is (dict.get()'s 2nd argument)
+    edges["source_region"] = edges["source_region"].apply(
+        lambda x: dict_acronyms_at_level.get(x, x)
+    )
+    # do the same for the the targets
+    edges["target_coords"] = edges[TO_COORDS_COLS].to_numpy().tolist()
+    edges["target_region"] = edges["target_coords"].apply(
+        lambda x: get_region(x, brain_regions, region_map)
+    )
+    edges["target_region"] = edges["target_region"].apply(
+        lambda x: dict_acronyms_at_level.get(x, x)
+    )
+
+    for region in regions_targeted:
+        # filter the segments that have either source or target point in that region
+        # N.B. for now we neglect the fact that a segment length might be counted
+        # twice overall if source and target regions are different
+        edges_in_region = edges[
+            (edges["source_region"] == region) | (edges["target_region"] == region)
+        ]
+
+        # compute the path lengths manually from the points coordinates
+        path_length = np.sum(edges_in_region["length"])
+        # update the lengths dict with the new values
+        lengths[region] = path_length
+    return lengths
+
+
 # pylint: disable=too-many-locals,too-many-statements,too-many-branches
 def create_ap_table(
     morph_dir, atlas_path, atlas_regions, atlas_hierarchy, hierarchy_level, output_path
@@ -30,6 +145,7 @@ def create_ap_table(
 
     Creates the axonal projections table for the morphologies found in 'morph_dir',
     at the given brain regions 'hierarchy_level'.
+    Computes the terminals and lengths in every target region of the morphologies.
 
     Args:
         morph_dir (str): path to the morphologies directory we want to use for the ap table.
@@ -44,11 +160,12 @@ def create_ap_table(
         None
 
     Outputs:
-        axonal_projections.csv: the file that will contain the ap table.
+        axon_terminals.csv: the file that will contain the terminals.
+        axon_lengths.csv: the file that will contain the lengths.
         ap_check.csv: a file that says how many of OOB terminal points we have for each morpho,
         and is used to compare with manual annotation in check_atlas.py
         regions_names.csv: a file that basically lists all acronyms and names of
-        brain regions used. This is just for information.
+        brain regions used. This is used at later stages of the workflow.
     """
     # create output dir if it does not exist
     os.makedirs(output_path, exist_ok=True)
@@ -64,9 +181,11 @@ def create_ap_table(
     rows_check = []
     # contains the entries for the dataframe for the tufts clustering
     rows_terminals = []
+    # contains the lengths of the axons in the regions where they terminate
+    rows_axon_lengths = []
     # get list of morphologies at morph_dir location
     list_morphs = nm.io.utils.get_morph_files(morph_dir)
-    # contains the lookup table of acronyms of leaf region to desired hierarchy level
+    # contains the lookup table of acronyms of leaf region to desired hierarchy level of terminals
     dict_acronyms_at_level = {}
     # dict that contains the ascendant regions for each acronym, and their explicit names.
     # Only used for manual checking/information.
@@ -95,39 +214,12 @@ def create_ap_table(
             continue
 
         terminal_id = 0
-        source_pos = morph.soma.center
-        # source_pos = morph.soma.get_center()
-        # if morph doesn't have a soma, take the average of the first points of
-        # each sections of basal dendrites as source pos
-        if source_pos is None or (isinstance(source_pos, list) and len(source_pos) == 0):
-            source_pos = np.mean(
-                [
-                    sec.points[0]
-                    for sec in iter_sections(morph, neurite_filter=basal_dendrite_filter)
-                ],
-                axis=0,
-            )[
-                0:3
-            ]  # exclude radius if it is present
-        logging.info("Found source position at %s", source_pos)
 
-        # get the source region
+        # find the source region
         try:
-            source_asc = region_map.get(
-                brain_regions.lookup(source_pos), "acronym", with_ascendants=True
+            source_region, region_names = find_and_register_source_region(
+                morph, region_names, brain_regions, region_map, hierarchy_level
             )
-            source_names = region_map.get(
-                brain_regions.lookup(source_pos), "name", with_ascendants=True
-            )
-            # select the source region at the desired hierarchy level
-            source_region = get_region_at_level(source_asc, hierarchy_level)
-            source_region_id = region_map.find(source_region, "acronym").pop()
-            if source_region not in region_names:
-                region_names[source_region] = [
-                    source_region_id,
-                    source_asc[-hierarchy_level - 1 :],
-                    source_names[-hierarchy_level - 1 :],
-                ]
         except Exception as e:  # pylint: disable=broad-except
             if "Region ID not found" in repr(e) or "Out" in repr(e):
                 logging.warning("Source region could not be found.")
@@ -139,26 +231,23 @@ def create_ap_table(
 
         axon = {"morph_path": morph_file, "source": source_region}
 
-        # find the targeted region by each terminal
-        # def axon_filter(n, id):
-        #     return n.type == nm.AXON and n.id == id
-
         try:
             axon_neurites = get_axons(morph)
         except Exception as e:  # pylint: disable=broad-except
             logging.debug("Axon could not be found. [Error: %s]", repr(e))
             num_morphs_wo_axon += 1
             continue
-        res = []
+
+        secs_terms_axons = []
         for axon_id, axon_neurite in enumerate(axon_neurites):
             # first find the terminal points
-            res += [
+            secs_terms_axons += [
                 (sec.id, sec.points.tolist()[-1], axon_id)
-                for sec in axon_neurite.iter_sections(order=Section.ileaf)
+                for sec in iter_sections(axon_neurite, neurite_order=Section.ileaf)
             ]
         # get the list of sections ids and terminal points
         try:
-            sections_id, terminal_points, axon_ids = zip(*res)
+            sections_id, terminal_points, axon_ids = zip(*secs_terms_axons)
         except Exception as e:  # pylint: disable=broad-except
             num_morphs_wo_axon += 1
             logging.warning("No terminal points found. [Error: %s]", repr(e))
@@ -243,6 +332,15 @@ def create_ap_table(
                 "name": morph_name_without_extension,
             }
         )
+
+        # compute the length of axon in regions where it terminates
+        lengths = compute_length_in_regions(
+            morph, set(terminals_regions), brain_regions, region_map, dict_acronyms_at_level
+        )
+        # and save it in rows_axon_lengths list
+        axon_lengths = {"morph_path": morph_file, "source": source_region}
+        axon_lengths.update(lengths)
+        rows_axon_lengths.append(axon_lengths)
     # end for morph
 
     if num_bad_morphs > 0 or num_oob_morphs > 0 or num_morphs_wo_axon > 0:
@@ -262,7 +360,9 @@ def create_ap_table(
     f_a = pd.DataFrame(rows)
     # fill with 0 regions not targeted by each axon (0 terminal points in these regions)
     f_a.replace(np.nan, 0, inplace=True)
-    f_a.to_csv(output_path + "axonal_projections_" + str(hierarchy_level) + ".csv")
+    # sort the columns after the "morph_path" and "source" columns
+    f_a = f_a[["morph_path", "source"] + sorted(f_a.columns[2:])]
+    f_a.to_csv(output_path + "axon_terminals_" + str(hierarchy_level) + ".csv")
 
     # this dataframe is just to validate that we use correct atlas
     check_df = pd.DataFrame(rows_check)
@@ -279,6 +379,13 @@ def create_ap_table(
     # terminals dataframe for the tufts clustering
     term_df = pd.DataFrame(rows_terminals)
     term_df.to_csv(output_path + "terminals.csv")
+
+    # dataframe of lengths of axons in regions where they terminate
+    lengths_df = pd.DataFrame(rows_axon_lengths)
+    lengths_df.replace(np.nan, 0, inplace=True)
+    # sort the columns after the "morph_path" and "source" columns
+    lengths_df = lengths_df[["morph_path", "source"] + sorted(lengths_df.columns[2:])]
+    lengths_df.to_csv(output_path + "axon_lengths_" + str(hierarchy_level) + ".csv")
 
 
 def main(config):

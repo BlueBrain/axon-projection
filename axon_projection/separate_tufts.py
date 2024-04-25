@@ -14,8 +14,8 @@ import networkx as nx
 import neurom as nm
 import numpy as np
 import pandas as pd
-from axon_synthesis.PCSF.clustering.utils import common_path
-from axon_synthesis.PCSF.clustering.utils import get_barcode
+from axon_synthesis.inputs.clustering.utils import common_path
+from axon_synthesis.inputs.clustering.utils import get_barcode
 from axon_synthesis.utils import neurite_to_graph
 from voxcell import OrientationField
 from voxcell.nexus.voxelbrain import Atlas

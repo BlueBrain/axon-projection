@@ -17,7 +17,7 @@ reqs = [
     "click>=7",
     "matplotlib",
     "networkx>=3.1",
-    "neurom @ git+https://github.com/BlueBrain/NeuroM.git@v4",
+    "neurom @ git+https://github.com/BlueBrain/NeuroM.git@4672c788f59bdbb8385e3ae3cc66f54811855050",
     "nexusforge>=0.8.1",
     "numpy",
     "pandas>=1.5.3",
@@ -25,8 +25,11 @@ reqs = [
     "voxcell>=3.1.5",
     "plotly>=5.17.0",
     "plotly-helper>=0.0.8",
-    "axon-synthesis>=0.1.0.dev0",
+    # "axon-synthesis>=0.1.0.dev0",
+    "axon-synthesis @ "
+    + "git+https://bbpgitlab.epfl.ch/neuromath/user/aberchet/axon-synthesis.git@refactor",
     "synthesis_workflow>=1.0.2",
+    "tabulate",
 ]
 
 doc_reqs = [
@@ -61,7 +64,7 @@ setup(
     },
     license="BBP-internal-confidential",
     packages=find_namespace_packages(include=["axon_projection*"]),
-    python_requires=">=3.8",
+    python_requires=">=3.10",
     version=VERSION,
     install_requires=reqs,
     extras_require={

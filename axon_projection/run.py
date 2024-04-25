@@ -11,7 +11,7 @@ from axon_projection.axonal_projections import main as create_ap_table
 from axon_projection.check_atlas import compare_axonal_projections
 from axon_projection.check_atlas import compare_source_regions
 from axon_projection.classify_axons import run_classification as classify_axons
-from axon_projection.plot_results import plot_clusters
+from axon_projection.plot_results import plot_results
 from axon_projection.sample_axon import main as sample_axon
 from axon_projection.separate_tufts import compute_clustered_tufts_scores
 from axon_projection.separate_tufts import compute_morph_properties
@@ -40,7 +40,7 @@ def full_workflow(config):
     compute_morph_properties(config)
 
     # plot the results
-    plot_clusters(config)
+    plot_results(config)
 
     if config["validation"]["verify_classification"] == "True":
         makedirs(config["output"]["path"] + "verify_GMM", exist_ok=True)
@@ -53,7 +53,7 @@ def full_workflow(config):
             # and plot the graphs again
             create_conn_graphs(config, verify=True)
         # and the clusters
-        plot_clusters(config, verify=True)
+        plot_results(config, verify=True)
 
 
 def hybrid_workflow(config):
@@ -81,7 +81,7 @@ def hybrid_workflow(config):
     compute_clustered_tufts_scores(config)
 
     # plot the clusters
-    plot_clusters(config)
+    plot_results(config)
 
 
 if __name__ == "__main__":
@@ -93,8 +93,8 @@ if __name__ == "__main__":
     config_ = configparser.ConfigParser()
     config_.read(sys.argv[1])
 
-    # full_workflow(config)
-    hybrid_workflow(config_)
+    full_workflow(config_)
+    # hybrid_workflow(config_)
 
     run_time = time.time() - start_time
     logging.info(
