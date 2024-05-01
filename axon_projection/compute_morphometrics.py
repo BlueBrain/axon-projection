@@ -81,7 +81,7 @@ def compute_stats_cv(
     # if morph_file and list_other_morphs are paths, load the morphos there
     if morphs_as_paths:
         # load the morpho
-        morph = nm.load_morphology(morph_file, process_subtrees=True)
+        morph = nm.load_morphology(morph_file)
         # morph = load_neuron_from_morphio(morph_file)
         # load the remaining population
         other_morphs = nm.load_morphologies(list_other_morphs)

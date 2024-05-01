@@ -18,7 +18,7 @@ def plot_html(
     If `morph2` is not None then the given morphology is also plotted for comparison.
     """
     if isinstance(morph_path, (str, Path)):
-        morph = load_morphology(morph_path, process_subtrees=True)
+        morph = load_morphology(morph_path)
         # morph = load_neuron_from_morphio(morph_path)
     else:
         morph = morph_path
@@ -28,7 +28,7 @@ def plot_html(
 
     if morph_path2 is not None:
         if isinstance(morph_path2, (str, Path)):
-            morph2 = load_morphology(morph_path2, process_subtrees=True)
+            morph2 = load_morphology(morph_path2)
             # morph2 = load_neuron_from_morphio(morph_path2)
         else:
             morph2 = morph_path2

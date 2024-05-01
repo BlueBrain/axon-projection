@@ -205,7 +205,7 @@ def create_ap_table(
         logging.info("Processing %s, progress : %.2f %% ", morph_file, 100.0 * i / num_total_morphs)
         # load morpho
         try:
-            morph = nm.load_morphology(morph_file, process_subtrees=True)
+            morph = nm.load_morphology(morph_file)
             # morph = nm.core.Morphology(Morphology(load_neuron_from_morphio(morph_file)))
         except Exception as e:  # pylint: disable=broad-except
             # skip this morph if it could not be loaded

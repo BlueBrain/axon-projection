@@ -16,10 +16,27 @@ def compare_feature_vectors(config):
     makedirs(config["output"]["path"] + "plots/", exist_ok=True)
 
     feature_vectors = ["axon_terminals", "axon_lengths"]
+    nb_regions = (
+        len(
+            pd.read_csv(
+                config["output"]["path"]
+                + feature_vectors[0]
+                + "_"
+                + config["morphologies"]["hierarchy_level"]
+                + ".csv",
+                index_col=0,
+            ).columns
+        )
+        - 2
+    )
     # create a figure with as many vertical subplots as there are feature vectors
     fig, ax = plt.subplots(
-        len(feature_vectors) + 1, 1, figsize=(10, 10 * (len(feature_vectors) + 1)), sharex=True
+        len(feature_vectors) + 1,
+        1,
+        figsize=(nb_regions / 4.0, 10 * (len(feature_vectors) + 1)),
+        sharex=True,
     )
+
     feature_vec_df_0 = pd.Series()
     for i, feature_vector in enumerate(feature_vectors):
         # load the feature vector
@@ -64,6 +81,17 @@ def compare_feature_vectors(config):
             np.arange(len(feature_vec_df)), labels=feature_vec_df.index.to_list(), rotation=90
         )
         ax[i].set_ylim(0, 1)
+    SMALL_SIZE = 8 + (nb_regions / 4.0)
+    MEDIUM_SIZE = 10 + (nb_regions / 4.0)
+    BIGGER_SIZE = 12 + (nb_regions / 4.0)
+
+    plt.rc("font", size=SMALL_SIZE)  # controls default text sizes
+    plt.rc("axes", titlesize=SMALL_SIZE)  # fontsize of the axes title
+    plt.rc("axes", labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+    plt.rc("xtick", labelsize=SMALL_SIZE)  # fontsize of the tick labels
+    plt.rc("ytick", labelsize=SMALL_SIZE)  # fontsize of the tick labels
+    plt.rc("legend", fontsize=SMALL_SIZE)  # legend fontsize
+    plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
     # save the fig
     fig.savefig(config["output"]["path"] + "plots/compare_feature_vectors.pdf")
     plt.close(fig)

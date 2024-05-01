@@ -29,7 +29,7 @@ from axon_projection.plot_utils import plot_tuft
 # pylint: disable=protected-access
 def create_tuft_morphology(morph, tuft_nodes_ids, common_ancestor, common_path_, shortest_paths):
     """Create a new morphology containing only the given tuft."""
-    tuft_morph = morph
+    tuft_morph = nm.core.Morphology(morph)
     try:
         tuft_ancestor = tuft_morph.section(common_ancestor)
     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -42,11 +42,12 @@ def create_tuft_morphology(morph, tuft_nodes_ids, common_ancestor, common_path_,
             logging.warning("Common ancestor not found. [%s]", repr(ex))
             return None, None
 
+    # if tuft has only one terminal, return it (up to the ancestor)
     if len(tuft_nodes_ids) == 1:
         for sec in tuft_morph.sections:
             if sec.id == tuft_ancestor.id:
                 continue
-            tuft_morph._morphio_morph.delete_section(sec.to_morphio(), recursive=False)
+            tuft_morph.delete_section(sec.morphio_section, recursive=False)
         return tuft_morph, tuft_ancestor
 
     tuft_nodes_paths = set(
@@ -70,13 +71,13 @@ def create_tuft_morphology(morph, tuft_nodes_ids, common_ancestor, common_path_,
     # delete all sections from the morph which do not belong to this tuft
     for i in tuft_morph.sections:
         if i.id not in tuft_nodes_paths:
-            tuft_morph._morphio_morph.delete_section(i.to_morphio(), recursive=False)
+            tuft_morph.delete_section(i.morphio_section, recursive=False)
 
     # delete all sections upstream of the tuft_ancestor
-    for sec in list(tuft_ancestor.iupstream()):
+    for sec in list(tuft_ancestor.iter(morphio.IterType.upstream)):
         if sec is tuft_ancestor:
             continue
-        tuft_morph._morphio_morph.delete_section(sec.to_morphio(), recursive=False)
+        tuft_morph.delete_section(sec, recursive=False)
 
     return tuft_morph, tuft_ancestor
 
@@ -115,13 +116,11 @@ def separate_tuft(
     """
     morph_file = group["morph_path"].iloc[0]
     # we load the morphology here because it can't be passed as an argument for a process
-    morph = nm.load_morphology(morph_file, process_subtrees=True)
-    morph._morphio_morph = morphio.mut.Morphology(morph_file)
-    # morph = load_neuron_from_morphio(morph_file)
+    morph = nm.load_morphology(morph_file)
     # keep only the axon of morph
-    for i in morph._morphio_morph.root_sections:
+    for i in morph.root_sections:
         if i.type != nm.AXON:
-            morph._morphio_morph.delete_section(i)
+            morph.delete_section(i)
     morph_name = morph_file.split("/")[-1].split(".")[0]
 
     target = group["target"].iloc[0]
@@ -184,7 +183,7 @@ def separate_tuft(
     tuft_orientation /= np.linalg.norm(tuft_orientation)
 
     # compute the barcode of the tuft
-    barcode = get_barcode(tuft_morph._morphio_morph)
+    barcode = get_barcode(tuft_morph)
 
     # store barcode with tuft properties in dict
     tuft.update(
@@ -199,8 +198,8 @@ def separate_tuft(
     export_tuft_path = Path(out_path_tufts) / morph_name
     export_tuft_morph_path = export_tuft_path / f"{target.replace('/','-')}.swc"
     # write the tuft_morph file
-    tuft_morph._morphio_morph.remove_unifurcations()
-    tuft_morph._morphio_morph.write(export_tuft_morph_path)
+    tuft_morph.remove_unifurcations()
+    tuft_morph.write(export_tuft_morph_path)
     logging.debug("Written tuft %s to %s.", tuft, export_tuft_morph_path)
     #  that will populate tufts dataframe
     tuft.update({"tuft_morph": str(export_tuft_morph_path)})
@@ -361,8 +360,6 @@ def compute_tuft_properties(config):
     # add the cluster_id column
     terminals_df["cluster_id"] = -1
 
-    morphio.set_maximum_warnings(1)
-
     logging.debug("Found %s morphs from terminals file %s.", len(list_morphs), morphos_path)
     with Manager() as manager:
         tufts_res_queue = manager.Queue()
@@ -373,8 +370,7 @@ def compute_tuft_properties(config):
             for morph_file in list_morphs:
                 logging.info("Processing tufts of morph %s...", morph_file)
                 # load the morphology
-                morph = nm.load_morphology(morph_file, process_subtrees=True)
-                # morph = load_neuron_from_morphio(morph_file)
+                morph = nm.load_morphology(morph_file)
                 morph_name = f"{Path(morph_file).with_suffix('').name.replace('/','-')}"
                 # create output dir for the tufts of this morph
                 os.makedirs(out_path_tufts + "/" + morph_name, exist_ok=True)
@@ -571,18 +567,17 @@ def separate_trunk(
     # create trunk morphology from graph
     # the trunk is computed as the union path to all tufts' ancestors
     trunk_common_path = trunk_path(directed_graph, list(tufts_common_ancestors_node_ids))
-    trunk_morph = nm.load_morphology(morph_file, process_subtrees=True)
-    trunk_morph._morphio_morph = morphio.mut.Morphology(morph_file)
+    trunk_morph = nm.load_morphology(morph_file)
 
     # delete all sections from the morph which do not belong to the trunk
     for i in trunk_morph.sections:
         if i.id not in trunk_common_path:
-            trunk_morph._morphio_morph.delete_section(i.to_morphio(), recursive=False)
+            trunk_morph.delete_section(i.morphio_section, recursive=False)
 
     # keep only the axon of morph
-    for i in trunk_morph._morphio_morph.root_sections:
+    for i in trunk_morph.root_sections:
         if i.type != nm.AXON:
-            trunk_morph._morphio_morph.delete_section(i)
+            trunk_morph.delete_section(i.morphio_section)
 
     # compute morphometrics
     for stat in trunk_morphometrics:
@@ -595,8 +590,8 @@ def separate_trunk(
     export_trunk_path = Path(out_path_trunks) / morph_name
     export_trunk_morph_path = export_trunk_path / f"trunk_{axon_id}.swc"
     # write the trunk morph file
-    trunk_morph._morphio_morph.remove_unifurcations()
-    trunk_morph._morphio_morph.write(export_trunk_morph_path)
+    trunk_morph.remove_unifurcations()
+    trunk_morph.write(export_trunk_morph_path)
     logging.debug("Written trunk %s to %s.", trunk, export_trunk_morph_path)
     #  that will populate tufts dataframe
     trunk.update({"trunk_morph": str(export_trunk_morph_path)})
@@ -622,8 +617,6 @@ def compute_trunk_properties(config, tufts_df):
     terminals_df = pd.read_csv(out_path + "terminals.csv")
     list_morphs = terminals_df.morph_path.unique()
 
-    morphio.set_maximum_warnings(1)
-
     all_trunks = []
     with Manager() as manager:
         trunks_res_queue = manager.Queue()
@@ -634,8 +627,7 @@ def compute_trunk_properties(config, tufts_df):
             for morph_file in list_morphs:
                 logging.info("Processing trunk of morph %s...", morph_file)
                 # load the morphology
-                morph = nm.load_morphology(morph_file, process_subtrees=True)
-                # morph = load_neuron_from_morphio(morph_file)
+                morph = nm.load_morphology(morph_file)
                 morph_name = f"{Path(morph_file).with_suffix('').name.replace('/','-')}"
                 # create output dir for the tufts of this morph
                 os.makedirs(out_path_trunks + "/" + morph_name, exist_ok=True)
@@ -705,6 +697,7 @@ def compute_trunk_properties(config, tufts_df):
 
 def compute_morph_properties(config):
     """Compute morphological properties of tufts and trunks using the given configuration."""
+    morphio.set_maximum_warnings(0)
     tufts_df = compute_tuft_properties(config)
     # keep only columns that are useful for the trunks computation
     tufts_df = tufts_df[["morph_path", "axon_id", "common_ancestor_node_id"]]
