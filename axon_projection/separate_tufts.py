@@ -706,9 +706,7 @@ def compute_morph_properties(config):
 
 def compute_clustered_tufts_scores(config):
     """Compute pre-clustered tuft rep scores using the given configuration."""
-    axon_synth_clustering_path = (
-        "/gpfs/bbp.cscs.ch/project/proj82/home/petkantc/sims/mimic_ML_PRE/inputs/Clustering/"
-    )
+    axon_synth_clustering_path = config["output"]["path"] + "Clustering/"
     tufts_props_path = axon_synth_clustering_path + "tuft_properties.json"
     out_path = config["output"]["path"]
 
@@ -754,9 +752,7 @@ def compute_clustered_tufts_scores(config):
     tufts_df.drop(columns=["target"], inplace=True)
 
     # output the tufts_df updated with the scores
-    with pathlib.Path(out_path + "tufts_properties_scores.json").open(
-        mode="w", encoding="utf-8"
-    ) as f:
+    with pathlib.Path(out_path + "tufts_properties.json").open(mode="w", encoding="utf-8") as f:
         json.dump(tufts_df.to_dict("records"), f, indent=4)
 
 

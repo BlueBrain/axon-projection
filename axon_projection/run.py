@@ -7,6 +7,8 @@ import time
 # from ast import literal_eval
 from os import makedirs
 
+from axon_synthesis.inputs.create import create_inputs
+
 from axon_projection.axonal_projections import main as create_ap_table
 from axon_projection.check_atlas import compare_axonal_projections
 from axon_projection.check_atlas import compare_source_regions
@@ -36,8 +38,27 @@ def full_workflow(config):
     if config["connectivity"]["skip_visualization"] == "False":
         create_conn_graphs(config)
 
-    # compute tuft properties and give them a representativity score
-    compute_morph_properties(config)
+    tufts_by_region = config["separate_tufts"]["clustering_method"] == "region"
+    if tufts_by_region:
+        # separate tufts, compute properties and give them a representativity score
+        compute_morph_properties(config)
+    else:
+        # separate the tufts with axon-synthesis's create-inputs
+        tufts_clustering_params = {
+            "sphere_parents": {
+                "method": "sphere_parents",
+                "sphere_radius": 300,
+                "max_path_distance": 300,
+            }
+        }
+        create_inputs(
+            config["morphologies"]["path"],
+            config["output"]["path"],
+            tufts_clustering_params,
+            debug=True,
+        )
+        # and compute representativity scores of the tufts
+        compute_clustered_tufts_scores(config)
 
     # plot the results
     plot_results(config)
@@ -56,34 +77,6 @@ def full_workflow(config):
         plot_results(config, verify=True)
 
 
-def hybrid_workflow(config):
-    """Runs the workflow with pre-clustered tufts with axon-synthesis."""
-    # create first the axonal projection table
-    create_ap_table(config)
-
-    # classify the axons based on the projection table
-    classify_axons(config)
-
-    # create graphs to visualize the resulting connectivity
-    if config["connectivity"]["skip_visualization"] == "False":
-        create_conn_graphs(config)
-
-    # separate the tufts with axon-synthesis's create-inputs
-    # TODO call create-inputs
-    # tufts_clustering_params = {
-    #     "sphere_parents":
-    #     {"method": "sphere_parents", "sphere_radius": 300, "max_path_distance": 300}
-    #     }
-    # create_inputs(config["morphologies"]["path"],
-    #               config["output"]["path"],
-    #               tufts_clustering_params)
-    # compute representativity scores of the tufts
-    compute_clustered_tufts_scores(config)
-
-    # plot the clusters
-    plot_results(config)
-
-
 if __name__ == "__main__":
     start_time = time.time()
 
@@ -94,7 +87,6 @@ if __name__ == "__main__":
     config_.read(sys.argv[1])
 
     full_workflow(config_)
-    # hybrid_workflow(config_)
 
     run_time = time.time() - start_time
     logging.info(
