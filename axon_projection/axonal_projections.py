@@ -142,7 +142,7 @@ def compute_length_in_regions(
         lengths[region] = path_length
     return lengths
 
-
+# pylint: disable=too-many-arguments
 def process_morphology(
     morph_file,
     region_names,
@@ -376,7 +376,7 @@ def create_ap_table(
         with Pool() as pool:
             args_list = []
             # Register each morpho in directory one by one
-            for i, morph_file in enumerate(list_morphs):
+            for morph_file in list_morphs:
                 args_list.append(
                     (
                         morph_file,

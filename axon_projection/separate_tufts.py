@@ -301,7 +301,7 @@ def compute_rep_score(tufts_df, morphometrics):
                             or os.path.islink(tuft_row["tuft_morph"])
                         ):
                             logging.warning(
-                                "Tuft " + tuft_row["tuft_morph"] + " not found, skipping it."
+                                "Tuft %s not found, skipping it.", tuft_row["tuft_morph"]
                             )
                             continue
 
@@ -757,7 +757,7 @@ def compute_clustered_tufts_scores(config):
     atlas_path = config["atlas"]["path"]
     atlas_regions = config["atlas"]["regions"]
     atlas_hierarchy = config["atlas"]["hierarchy"]
-    _, brain_regions, region_map = load_atlas(atlas_path, atlas_regions, atlas_hierarchy)
+    _, brain_regions, _ = load_atlas(atlas_path, atlas_regions, atlas_hierarchy)
     # concatenate common_ancestor_x, common_ancestor_y and common_ancestor_z into a new column
     tufts_df["ancestor_coords"] = tufts_df.apply(
         lambda row: (row["common_ancestor_x"], row["common_ancestor_y"], row["common_ancestor_z"]),

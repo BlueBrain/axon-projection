@@ -71,7 +71,7 @@ def existing_paths(list_paths):
     for path in list_paths:
         # if file is not found, skip it
         if not (os.path.isfile(path) or os.path.islink(path)):
-            logging.warning("File " + path + " not found, skipping it.")
+            logging.warning("File %s not found, skipping it.", path)
             continue
         list_paths_ok.append(path)
     return list_paths_ok
@@ -103,8 +103,8 @@ def compute_stats_cv(
         # keep only morphs that exist
         list_other_morphs_ok = existing_paths(list_other_morphs)
         # if morph or other_pop are empty, exit
-        if (len(list_other_morphs_ok) == 0) or not (morph_exists(morph_file)):
-            logging.warning(f"Pop to compare empty or non existing morph {morph_file}.")
+        if (len(list_other_morphs_ok) == 0) or not morph_exists(morph_file):
+            logging.warning("Pop to compare empty or non existing morph %s.", morph_file)
             return
 
         # load the morpho

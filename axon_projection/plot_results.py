@@ -426,7 +426,7 @@ def aggregate_regions_columns(df, regions_subset):
         df[region] = df.filter(regex=region, axis=1).sum(axis=1)
     return df
 
-
+# pylint: disable=too-many-statements
 def compare_lengths_in_regions(config, feature_vec="lengths", source=None):
     """Compares the lengths in region between bio and synth axons."""
     makedirs(config["output"]["path"] + "plots/", exist_ok=True)
@@ -449,7 +449,7 @@ def compare_lengths_in_regions(config, feature_vec="lengths", source=None):
         )
     except FileNotFoundError:
         logging.warning("Synth axons path not found, skipping comparison.")
-        exit(1)
+        sys.exit(1)
 
     if str(config["morphologies"]["hierarchy_level"]) == "7":
         regions_subset = ["MOp", "MOs", "SSp", "SSs", "CP", "PG", "SPVI"]
@@ -535,8 +535,8 @@ def compare_lengths_in_regions(config, feature_vec="lengths", source=None):
         # _, p_value = stats.ttest_ind(bio_data, synth_data)
         try:
             mvs = mvs_score(bio_data, synth_data)
-        except Exception as e:
-            logging.warning(f"mvs failed for {region}, [Error: {repr(e)}]")
+        except Exception as e:  # pylint: disable=broad-except
+            logging.warning("mvs failed for %s, [Error: %s]", region, repr(e))
             mvs = 1
         print(f"{mvs}")
         # Define significance levels
@@ -613,6 +613,7 @@ def compare_lengths_in_regions(config, feature_vec="lengths", source=None):
 
     # Show the plot
     plt.savefig(config["output"]["path"] + "plots/compare_" + feature_vec + "_distrib.pdf")
+    # pylint: disable=logging-not-lazy
     logging.info(
         "Saved plot to "
         + config["output"]["path"]
@@ -741,6 +742,85 @@ def compare_lengths_vs_connectivity(
     ax2.legend(loc="upper right")
     fig.savefig(os.path.split(df_synth_path)[0] + "/lengths_vs_connectivity.png")
 
+# pylint: disable=dangerous-default-value
+def compare_connectivity(
+    df_no_axons_path,
+    df_axons_path,
+    source="MOp5",
+    target_regions=["MOp", "MOs", "SSp", "SSs", "CP", "PG", "VISp"],
+    atlas_hierarchy="/gpfs/bbp.cscs.ch/project/proj148/scratch/"
+    "circuits/20240531/.atlas/hierarchy.json",
+):
+    """Compare and plot bio lengths vs synth connectivity."""
+    df_no_axons = pd.read_csv(df_no_axons_path)
+    df_axons = pd.read_csv(df_axons_path)
+
+    df_no_axons = df_no_axons[df_no_axons["idx-region_pre"].str.contains(source)]
+    df_axons = df_axons[df_axons["idx-region_pre"].str.contains(source)]
+
+    with open(atlas_hierarchy, encoding="utf-8") as f:
+        hierarchy_data = json.load(f)
+    hierarchy = hierarchy_data["msg"][0]
+    parent_mapping = build_parent_mapping(hierarchy)
+
+    df_no_axons["parent_region"] = df_no_axons["idx-region_post"].apply(
+        lambda x: find_parent_acronym(x, parent_mapping, target_regions)
+    )
+    df_no_axons = df_no_axons.dropna(subset=["parent_region"])
+    df_no_axons = df_no_axons.rename(columns={"0": "connectivity_count"})
+    df_no_axons = df_no_axons[df_no_axons["connectivity_count"] > 0]
+    df_no_axons["type"] = "local_axons"
+
+    df_axons["parent_region"] = df_axons["idx-region_post"].apply(
+        lambda x: find_parent_acronym(x, parent_mapping, target_regions)
+    )
+    df_axons = df_axons.dropna(subset=["parent_region"])
+    df_axons = df_axons.rename(columns={"0": "connectivity_count"})
+    df_axons = df_axons[df_axons["connectivity_count"] > 0]
+    df_axons["type"] = "long_range_axons"
+
+    df_no_axons.to_csv(os.path.split(df_no_axons_path)[0] + "/connectivity_with_parents_no_axons.csv")
+    df_axons.to_csv(os.path.split(df_axons_path)[0] + "/connectivity_with_parents_axons.csv")
+
+    # finally, plot the lengths vs connectivity for the parent regions, on twin y axes
+    fig, ax = plt.subplots()
+    ax2 = ax.twinx()
+
+    # Define RGBA color for 'tab:blue' with alpha = 0.5
+    tab_green_rgb = mcolors.to_rgb("tab:green")
+    tab_red_rgb = mcolors.to_rgb("tab:red")
+    # Define the color palette
+    palette = {"local": tab_green_rgb, "long_range": tab_red_rgb}
+
+    ax.bar(
+        df_no_axons["parent_region"],
+        df_no_axons["connectivity_count"],
+        width=-0.35,
+        align="edge",
+        color=palette["local"],
+        label="Local axons connections",
+    )
+    ax2.bar(
+        df_axons["parent_region"],
+        df_axons["connectivity_count"],
+        width=0.35,
+        align="edge",
+        color=palette["long_range"],
+        label="Long range axons connections",
+    )
+    # set log scale
+    ax.set_yscale("log")
+    ax2.set_yscale("log")
+
+    ax.set_ylabel("Number of connections")
+    ax2.set_ylabel("Number of connections")
+    ax.set_xlabel("Region")
+    ax.set_title("Number of connections local axons vs. long range axons from " + source)
+
+    ax.legend(loc="upper left")
+    ax2.legend(loc="upper right")
+    fig.savefig(os.path.split(df_axons_path)[0] + "/connectivity_local_vs_long.png")
+
 
 def plot_results(config, verify=False):
     """Plots all the results."""
@@ -756,7 +836,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     if len(sys.argv) != 3:
         print("Usage: python plot_results.py <config_file> <verify_bool>")
-        exit(1)
+        sys.exit(1)
     logging.debug("Running plot_results.py with config %s and verify %s", sys.argv[1], sys.argv[2])
     config_ = configparser.ConfigParser()
     config_.read(sys.argv[1])
