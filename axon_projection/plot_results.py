@@ -426,6 +426,7 @@ def aggregate_regions_columns(df, regions_subset):
         df[region] = df.filter(regex=region, axis=1).sum(axis=1)
     return df
 
+
 # pylint: disable=too-many-statements
 def compare_lengths_in_regions(config, feature_vec="lengths", source=None):
     """Compares the lengths in region between bio and synth axons."""
@@ -742,6 +743,7 @@ def compare_lengths_vs_connectivity(
     ax2.legend(loc="upper right")
     fig.savefig(os.path.split(df_synth_path)[0] + "/lengths_vs_connectivity.png")
 
+
 # pylint: disable=dangerous-default-value
 def compare_connectivity(
     df_no_axons_path,
@@ -779,7 +781,9 @@ def compare_connectivity(
     df_axons = df_axons[df_axons["connectivity_count"] > 0]
     df_axons["type"] = "long_range_axons"
 
-    df_no_axons.to_csv(os.path.split(df_no_axons_path)[0] + "/connectivity_with_parents_no_axons.csv")
+    df_no_axons.to_csv(
+        os.path.split(df_no_axons_path)[0] + "/connectivity_with_parents_no_axons.csv"
+    )
     df_axons.to_csv(os.path.split(df_axons_path)[0] + "/connectivity_with_parents_axons.csv")
 
     # finally, plot the lengths vs connectivity for the parent regions, on twin y axes

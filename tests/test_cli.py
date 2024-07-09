@@ -1,10 +1,10 @@
 """Tests for the axon_projection.cli module."""
-import axon_projection.cli
 
 
 def test_cli(cli_runner):
     # pylint: disable=unused-argument
     """Test the CLI."""
+    # import axon_projection.cli
     # result = cli_runner.invoke(
     #     axon_projection.cli.main,
     #     [

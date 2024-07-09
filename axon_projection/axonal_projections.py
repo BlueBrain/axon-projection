@@ -142,6 +142,7 @@ def compute_length_in_regions(
         lengths[region] = path_length
     return lengths
 
+
 # pylint: disable=too-many-arguments
 def process_morphology(
     morph_file,
