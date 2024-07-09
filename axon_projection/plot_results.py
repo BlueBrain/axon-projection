@@ -654,6 +654,7 @@ def find_parent_acronym(acronym, parent_mapping, target_regions):
     return None
 
 
+# pylint: disable=dangerous-default-value
 def compare_lengths_vs_connectivity(
     df_bio_path,
     df_synth_path,
