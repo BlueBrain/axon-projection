@@ -1,6 +1,7 @@
 """Functions to compute and compare the morphometrics of morphologies in the same class."""
 import configparser
 import logging
+import os.path
 import sys
 from multiprocessing import Process
 from multiprocessing import Queue
@@ -64,6 +65,25 @@ def compute_stats_parallel(morphometrics, pop, neurite_type=nm.AXON):
     return res_dict
 
 
+def existing_paths(list_paths):
+    """Returns a list of paths that exist from a list of paths."""
+    list_paths_ok = []
+    for path in list_paths:
+        # if file is not found, skip it
+        if not (os.path.isfile(path) or os.path.islink(path)):
+            logging.warning("File " + path + " not found, skipping it.")
+            continue
+        list_paths_ok.append(path)
+    return list_paths_ok
+
+
+def morph_exists(morph_path):
+    """Returns True if the morpho exists, False otherwise."""
+    if not (os.path.isfile(morph_path) or os.path.islink(morph_path)):
+        return False
+    return True
+
+
 # pylint: disable=too-many-arguments
 def compute_stats_cv(
     morph_file,
@@ -80,11 +100,18 @@ def compute_stats_cv(
     dict_rows = {}
     # if morph_file and list_other_morphs are paths, load the morphos there
     if morphs_as_paths:
+        # keep only morphs that exist
+        list_other_morphs_ok = existing_paths(list_other_morphs)
+        # if morph or other_pop are empty, exit
+        if (len(list_other_morphs_ok) == 0) or not (morph_exists(morph_file)):
+            logging.warning(f"Pop to compare empty or non existing morph {morph_file}.")
+            return
+
         # load the morpho
         morph = nm.load_morphology(morph_file)
         # morph = load_neuron_from_morphio(morph_file)
         # load the remaining population
-        other_morphs = nm.load_morphologies(list_other_morphs)
+        other_morphs = nm.load_morphologies(list_other_morphs_ok)
         dict_rows = {"morph_path": morph_file}
     # otherwise, we can provide morphos directly (NeuroM or MorphIO)
     else:

@@ -36,7 +36,7 @@ The output of this step, is the creation of classes for each source region, defi
 
 ## Installation
 
-First, create a virtual environment with at least python 3.8, and activate it:
+First, create a virtual environment with at least python 3.10, and activate it:
 ```bash
 python -m venv venvAP
 source venvAP/bin/activate
@@ -52,6 +52,15 @@ And then install the package by running at the `setup.py` location:
 pip install --index-url https://bbpteam.epfl.ch/repository/devpi/simple -e .
 ```
 
+## Running
+
+```bash
+python run.py <config_file>
+```
+or
+```bash
+axon-projection -c <config_file>
+```
 ## Examples
 
 The `example` folder contains some files to run an example of the code.

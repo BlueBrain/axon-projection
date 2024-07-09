@@ -3,6 +3,7 @@ import configparser
 import json
 import logging
 import os
+import os.path
 import pathlib
 import sys
 from multiprocessing import Manager
@@ -24,6 +25,7 @@ from axon_projection.compute_morphometrics import compute_stats_cv
 from axon_projection.compute_morphometrics import get_axons
 from axon_projection.plot_utils import plot_trunk
 from axon_projection.plot_utils import plot_tuft
+from axon_projection.query_atlas import load_atlas
 
 
 # pylint: disable=protected-access
@@ -268,7 +270,7 @@ def compute_rep_score(tufts_df, morphometrics):
     """
     logging.info("Computing representativity scores...")
     res = []
-    pop_ids = tufts_df.population_id.unique()
+    pop_ids = tufts_df.target_population_id.unique()
 
     with Manager() as manager:
         res_queue = manager.Queue()
@@ -278,7 +280,7 @@ def compute_rep_score(tufts_df, morphometrics):
             args_list = []
             # for every source region (position of the soma) + class (= pop_id) of a tuft
             for pop_id in pop_ids:
-                df_same_pop = tufts_df[tufts_df["population_id"] == pop_id]
+                df_same_pop = tufts_df[tufts_df["target_population_id"] == pop_id]
                 for group_name, group in df_same_pop.groupby("target"):
                     # if there is only one point in that class, with same target, there
                     # is nothing to compare
@@ -293,6 +295,16 @@ def compute_rep_score(tufts_df, morphometrics):
                         continue
                     # for every tuft, compute the representativity score
                     for index, tuft_row in group.iterrows():
+                        # if tuft somehow is not found, skip it
+                        if not (
+                            os.path.isfile(tuft_row["tuft_morph"])
+                            or os.path.islink(tuft_row["tuft_morph"])
+                        ):
+                            logging.warning(
+                                "Tuft " + tuft_row["tuft_morph"] + " not found, skipping it."
+                            )
+                            continue
+
                         logging.debug("Computing rep_score for tuft in %s.", tuft_row["target"])
                         # if n_terms is 1, we can't compute the morphometrics
                         if tuft_row["n_terms"] < 2:
@@ -347,7 +359,6 @@ def compute_rep_score(tufts_df, morphometrics):
 def compute_tuft_properties(config):
     """Compute tuft properties and optionally plot them."""
     out_path = config["output"]["path"]
-    morphos_path = config["morphologies"]["path"]
     plot_debug = config["separate_tufts"]["plot_debug"].lower() == "true"
     out_path_tufts = out_path + "tufts"
     os.makedirs(out_path_tufts, exist_ok=True)
@@ -360,7 +371,9 @@ def compute_tuft_properties(config):
     # add the cluster_id column
     terminals_df["cluster_id"] = -1
 
-    logging.debug("Found %s morphs from terminals file %s.", len(list_morphs), morphos_path)
+    logging.debug(
+        "Found %s morphs from terminals file %s.", len(list_morphs), out_path + "terminals.csv"
+    )
     with Manager() as manager:
         tufts_res_queue = manager.Queue()
 
@@ -469,7 +482,7 @@ def compute_tuft_properties(config):
     logging.info("Writing tufts dataframe to %s...", out_path + "tufts_df.csv")
     tufts_df.to_csv(out_path + "tufts_df.csv")
 
-    logging.info("Writing tufts JSON to %s...", out_path + "tufts_properties.json")
+    logging.info("Writing tufts JSON to %s...", out_path + "tuft_properties.json")
     # format the df for synthesis inputs
     tufts_json = tufts_df.rename(
         columns={"rep_score": "weight", "tuft_orientation": "orientation"}, inplace=False
@@ -489,7 +502,7 @@ def compute_tuft_properties(config):
         inplace=True,
     )
     # export tufts as json
-    with pathlib.Path(out_path + "tufts_properties.json").open(mode="w", encoding="utf-8") as f:
+    with pathlib.Path(out_path + "tuft_properties.json").open(mode="w", encoding="utf-8") as f:
         json.dump(tufts_json.to_dict("records"), f, indent=4)
 
     logging.info("Done classifying tufts.")
@@ -706,6 +719,7 @@ def compute_morph_properties(config):
 
 def compute_clustered_tufts_scores(config):
     """Compute pre-clustered tuft rep scores using the given configuration."""
+    logging.info("Starting computation of tufts scores.")
     axon_synth_clustering_path = config["output"]["path"] + "Clustering/"
     tufts_props_path = axon_synth_clustering_path + "tuft_properties.json"
     out_path = config["output"]["path"]
@@ -739,7 +753,24 @@ def compute_clustered_tufts_scores(config):
     tufts_df["population_id"] = tufts_df["morph_file"].map(
         posteriors_df.set_index("morph_path")["population_id"]
     )
-
+    # TODO compute tufts target_population_id by taking the region of the tuft ancestor
+    atlas_path = config["atlas"]["path"]
+    atlas_regions = config["atlas"]["regions"]
+    atlas_hierarchy = config["atlas"]["hierarchy"]
+    _, brain_regions, region_map = load_atlas(atlas_path, atlas_regions, atlas_hierarchy)
+    # concatenate common_ancestor_x, common_ancestor_y and common_ancestor_z into a new column
+    tufts_df["ancestor_coords"] = tufts_df.apply(
+        lambda row: (row["common_ancestor_x"], row["common_ancestor_y"], row["common_ancestor_z"]),
+        axis=1,
+    )
+    tufts_df["target_region_id"] = brain_regions.lookup(
+        tufts_df["ancestor_coords"].tolist(), outer_value=-1
+    )
+    tufts_df["target_population_id"] = (
+        tufts_df["population_id"].astype(str) + "_" + tufts_df["target_region_id"].astype(str)
+    )
+    # finally replace pop_id with target_pop_id
+    tufts_df["population_id"] = tufts_df["target_population_id"].astype(str)
     # compute scores
     # list of morphometrics features to compute
     features_str = config["compare_morphometrics"]["features"]
@@ -752,7 +783,7 @@ def compute_clustered_tufts_scores(config):
     tufts_df.drop(columns=["target"], inplace=True)
 
     # output the tufts_df updated with the scores
-    with pathlib.Path(out_path + "tufts_properties.json").open(mode="w", encoding="utf-8") as f:
+    with pathlib.Path(out_path + "tuft_properties.json").open(mode="w", encoding="utf-8") as f:
         json.dump(tufts_df.to_dict("records"), f, indent=4)
 
 

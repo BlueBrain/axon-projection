@@ -6,6 +6,7 @@ import time
 
 # from ast import literal_eval
 from os import makedirs
+from os import popen
 
 from axon_synthesis.inputs.create import create_inputs
 
@@ -13,6 +14,7 @@ from axon_projection.axonal_projections import main as create_ap_table
 from axon_projection.check_atlas import compare_axonal_projections
 from axon_projection.check_atlas import compare_source_regions
 from axon_projection.classify_axons import run_classification as classify_axons
+from axon_projection.count_tufts import compute_tufts_distribution_per_cluster
 from axon_projection.plot_results import plot_results
 from axon_projection.sample_axon import main as sample_axon
 from axon_projection.separate_tufts import compute_clustered_tufts_scores
@@ -51,6 +53,7 @@ def full_workflow(config):
                 "max_path_distance": 300,
             }
         }
+        # debug = true is necessary to create the tufts file
         create_inputs(
             config["morphologies"]["path"],
             config["output"]["path"],
@@ -59,6 +62,8 @@ def full_workflow(config):
         )
         # and compute representativity scores of the tufts
         compute_clustered_tufts_scores(config)
+    # compute the distribution of number of tufts per cluster
+    compute_tufts_distribution_per_cluster(config)
 
     # plot the results
     plot_results(config)
@@ -77,18 +82,26 @@ def full_workflow(config):
         plot_results(config, verify=True)
 
 
-if __name__ == "__main__":
+def run_axon_projection(config_path):
+    """Runs the whole axonal projection workflow."""
     start_time = time.time()
 
     log_format = "%(asctime)s [%(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
     logging.basicConfig(level=logging.INFO, format=log_format, force=True)
 
+    # read the config file
     config_ = configparser.ConfigParser()
-    config_.read(sys.argv[1])
-
+    config_.read(config_path)
+    # copy config file to out dir for debugging
+    popen("cp " + config_path + " " + config_["output"]["path"] + "/.")
+    # run the workflow
     full_workflow(config_)
 
     run_time = time.time() - start_time
     logging.info(
         "Done in %.2f s = %.2f min = %.2f h.", run_time, run_time / 60.0, run_time / 3600.0
     )
+
+
+if __name__ == "__main__":
+    run_axon_projection(sys.argv[1])

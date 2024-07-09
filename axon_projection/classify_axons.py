@@ -276,6 +276,7 @@ def run_classification(config, verify=False):
                         target_region_id,
                         source_pop_id + "_" + str(target_region_id),
                         gmm.means_[c][t] / np.sum(gmm.means_[c]),
+                        gmm.means_[c][t],
                     ]
                 )
 
@@ -310,6 +311,7 @@ def run_classification(config, verify=False):
             "target_brain_region_id",
             "target_population_id",
             "probability",
+            "feature_means",
         ],
     )
     df_conn.to_csv(out_path + "conn_probs.csv")

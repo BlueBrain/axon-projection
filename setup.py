@@ -26,8 +26,6 @@ reqs = [
     "plotly>=5.17.0",
     "plotly-helper>=0.0.8",
     "axon-synthesis>=0.1.0.dev0",
-    # "axon-synthesis @ "
-    # + "git+https://bbpgitlab.epfl.ch/neuromath/user/aberchet/axon-synthesis.git@refactor",
     "synthesis_workflow>=1.0.2",
     "tabulate",
 ]

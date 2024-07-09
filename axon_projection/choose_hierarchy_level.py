@@ -34,7 +34,7 @@ def extract_acronyms_at_level(data, level):
     return acronyms
 
 
-def get_region_at_level(list_asc, level, hierarchy_file="mba_hierarchy.json"):
+def get_region_at_level(list_asc, level, hierarchy_file):
     """Gets the brain region at desired level, knowing its ascendants.
 
     Recursive function that gets the brain region at the given hierarchy 'level'. It is

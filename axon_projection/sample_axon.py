@@ -60,7 +60,13 @@ def sample_axon(source_region, params_file, regions_file, n=0):
 
     # Round n_terms to the nearest integer and set negative values to 0
     rounded_n_terms = np.round(n_terms)
+    print(type(rounded_n_terms))
+    print(rounded_n_terms.shape)
     rounded_n_terms[rounded_n_terms < 0] = 0
+    # for each cluster
+    for c, cl_id in enumerate(class_ids):
+        # force to 0 values where mean was 0
+        rounded_n_terms[c] = np.where(gmm.means_[cl_id] <= 1e-16, 0, rounded_n_terms[c])
 
     logging.debug("Rounded n_terms: %s", rounded_n_terms)
     # create a df with the class_ids and rounded_n_terms
