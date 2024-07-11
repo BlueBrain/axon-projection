@@ -53,13 +53,17 @@ def full_workflow(config):
                 "max_path_distance": 300,
             }
         }
-        # debug = true is necessary to create the tufts file
-        create_inputs(
-            config["morphologies"]["path"],
-            config["output"]["path"],
-            tufts_clustering_params,
-            debug=True,
-        )
+        if (
+            config.has_option("separate_tufts", "cluster_tufts")
+            and config["separate_tufts"]["cluster_tufts"] == "True"
+        ):
+            # debug = true is necessary to create the tufts file
+            create_inputs(
+                config["morphologies"]["path"],
+                config["output"]["path"],
+                tufts_clustering_params,
+                debug=True,
+            )
         # and compute representativity scores of the tufts
         compute_clustered_tufts_scores(config)
     # compute the distribution of number of tufts per cluster

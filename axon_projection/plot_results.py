@@ -427,72 +427,93 @@ def aggregate_regions_columns(df, regions_subset):
     return df
 
 
-# pylint: disable=too-many-statements
-def compare_lengths_in_regions(config, feature_vec="lengths", source=None):
+# pylint: disable=too-many-statements, dangerous-default-value
+def compare_feat_in_regions(
+    df_bio_path,
+    df_synth_path,
+    feature_vec="lengths",
+    source="MOp5",
+    regions_subset=["MOp", "MOs", "SSp", "SSs", "CP", "PG", "SPVI"],
+    out_path="./",
+    atlas_hierarchy="/gpfs/bbp.cscs.ch/project/proj148/scratch/"
+    "circuits/20240531/.atlas/hierarchy.json",
+):
     """Compares the lengths in region between bio and synth axons."""
-    makedirs(config["output"]["path"] + "plots/", exist_ok=True)
-    bio_lengths_df = pd.read_csv(
-        config["output"]["path"]
-        + "axon_"
-        + feature_vec
-        + "_"
-        + str(config["morphologies"]["hierarchy_level"])
-        + ".csv"
-    )
-    try:
-        synth_lengths_df = pd.read_csv(
-            config["validation"]["synth_axons_path"]
-            + "/axon_"
-            + feature_vec
-            + "_"
-            + str(config["morphologies"]["hierarchy_level"])
-            + ".csv"
-        )
-    except FileNotFoundError:
-        logging.warning("Synth axons path not found, skipping comparison.")
-        sys.exit(1)
+    os.makedirs(out_path, exist_ok=True)
+    bio_feat_df = pd.read_csv(df_bio_path, index_col=0)
+    synth_feat_df = pd.read_csv(df_synth_path, index_col=0)
 
-    if str(config["morphologies"]["hierarchy_level"]) == "7":
-        regions_subset = ["MOp", "MOs", "SSp", "SSs", "CP", "PG", "SPVI"]
-        if source is None:
-            source = "MOp"
-    elif str(config["morphologies"]["hierarchy_level"]) == "8":
-        regions_subset = ["CP"]
-        if source is None:
-            source = "MOp5"
-
-    regions_subset = ["MOp", "MOs", "SSp", "SSs", "CP", "PG", "SPVI"]
     # filter on just the source region of interest
-    bio_lengths_df = bio_lengths_df[bio_lengths_df["source"] == source]
-    synth_lengths_df = synth_lengths_df[synth_lengths_df["source"] == source]
+    bio_feat_df = bio_feat_df[bio_feat_df["source"] == source]
+    synth_feat_df = synth_feat_df[synth_feat_df["source"] == source]
 
-    # # keep only columns that contain a substring of one of the regions_subset
-    # bio_filtered = bio_lengths_df.filter(regex=("|".join(regions_subset)), axis=1)
-    # synth_filtered = synth_lengths_df.filter(regex=("|".join(regions_subset)), axis=1)
+    # build the parent mapping
+    with open(atlas_hierarchy, encoding="utf-8") as f:
+        hierarchy_data = json.load(f)
+    hierarchy = hierarchy_data["msg"][0]
+    parent_mapping = build_parent_mapping(hierarchy)
 
-    # Filter the DataFrames to include only the selected regions
-    bio_lengths_df = aggregate_regions_columns(bio_lengths_df, regions_subset)
-    synth_lengths_df = aggregate_regions_columns(synth_lengths_df, regions_subset)
-    bio_filtered = bio_lengths_df[regions_subset]
-    synth_filtered = synth_lengths_df[regions_subset]
+    # first count the number of morphs terminating in each region
+    total_rows_bio = len(bio_feat_df)
+    total_rows_synth = len(synth_feat_df)
+    list_ROI = []
+    parent_dict = {}
+    for target_region in bio_feat_df.columns[2:]:
+        if find_parent_acronym(target_region, parent_mapping, regions_subset) is not None:
+            list_ROI.append(target_region)
+            parent_dict[target_region] = find_parent_acronym(
+                target_region, parent_mapping, regions_subset
+            )
+    bio_ROI = bio_feat_df[list_ROI]
+    bio_ROI.to_csv(out_path + source + "_bio_ROI_all.csv")
+    synth_ROI = synth_feat_df[list_ROI]
+    # sum columns that have same parent, and rename the columns to the parent's name
+    bio_ROI = bio_ROI.groupby(parent_dict, axis=1).sum()
+    synth_ROI = synth_ROI.groupby(parent_dict, axis=1).sum()
+    bio_ROI.to_csv(out_path + source + "_bio_ROI.csv")
+    dict_bio_count = {}
+    dict_synth_count = {}
+    for region in regions_subset:
+        dict_bio_count[region] = len(bio_ROI[bio_ROI[region] > 0.0])
+        dict_synth_count[region] = len(synth_ROI[synth_ROI[region] > 0.0])
+    print(dict_bio_count)
 
-    # Melt the DataFrames to long format for easier plotting
-    bio_melted = bio_filtered.melt(var_name="Region", value_name="Length")
-    bio_melted = bio_melted[bio_melted["Length"] > 0.0]
-    synth_melted = synth_filtered.melt(var_name="Region", value_name="Length")
-    synth_melted = synth_melted[synth_melted["Length"] > 0.0]
+    # drop the morph_path and source columns
+    bio_feat_df = bio_feat_df.drop(["morph_path", "source"], axis=1)
+    synth_feat_df = synth_feat_df.drop(["morph_path", "source"], axis=1)
+
+    bio_feat_df.to_csv(out_path + source + "_bio.csv")
+
+    bio_feat_df = bio_feat_df.melt(var_name="Region", value_name=feature_vec)
+    synth_feat_df = synth_feat_df.melt(var_name="Region", value_name=feature_vec)
+    bio_feat_df = bio_feat_df[bio_feat_df[feature_vec] > 0.0]
+    synth_feat_df = synth_feat_df[synth_feat_df[feature_vec] > 0.0]
+
+    # bio_feat_df = bio_feat_df.reset_index()
+    # synth_feat_df = synth_feat_df.reset_index()
+    bio_feat_df["parent_region"] = bio_feat_df["Region"].apply(
+        lambda x: find_parent_acronym(x, parent_mapping, regions_subset)
+    )
+    synth_feat_df["parent_region"] = synth_feat_df["Region"].apply(
+        lambda x: find_parent_acronym(x, parent_mapping, regions_subset)
+    )
+    # drop the regions which don't have a parent in the regions_subset
+    bio_feat_df = bio_feat_df.dropna(subset=["parent_region"])
+    synth_feat_df = synth_feat_df.dropna(subset=["parent_region"])
+
+    # Add a column to distinguish between bio and synth data
+    bio_feat_df["Type"] = "Bio"
+    synth_feat_df["Type"] = "Synth"
+
+    bio_feat_df.to_csv(out_path + "bio_feat_melted_" + feature_vec + ".csv")
 
     # Define RGBA color for 'tab:blue' with alpha = 0.5
     tab_blue_rgb = mcolors.to_rgb("tab:blue")
     tab_red_rgb = mcolors.to_rgb("tab:red")
     # Define the color palette
     palette = {"Bio": tab_blue_rgb, "Synth": tab_red_rgb}
-    # Add a column to distinguish between bio and synth data
-    bio_melted["Type"] = "Bio"
-    synth_melted["Type"] = "Synth"
-
     # Combine the two DataFrames
-    combined_df = pd.concat([bio_melted, synth_melted])
+    combined_df = pd.concat([bio_feat_df, synth_feat_df])
 
     plt.rcParams.update({"font.size": 14})  # Set default fontsize
     plt.figure(figsize=(10, 10))
@@ -502,14 +523,19 @@ def compare_lengths_in_regions(config, feature_vec="lengths", source=None):
     barwidth = 0.4
     # for the boxplot or violinplot
     ax = plt.subplot(3, 1, (2, 3), sharex=ax2)
-    combined_df = combined_df[combined_df["Length"] > 0.0]
+    combined_df = combined_df[combined_df[feature_vec] > 0.0]
     sns.boxplot(
-        x="Region", y="Length", hue="Type", data=combined_df, palette=palette, log_scale=True
+        x="parent_region",
+        y=feature_vec,
+        hue="Type",
+        data=combined_df,
+        palette=palette,
+        log_scale=True,
     )
 
     sns.violinplot(
-        x="Region",
-        y="Length",
+        x="parent_region",
+        y=feature_vec,
         hue="Type",
         data=combined_df,
         split=True,
@@ -517,20 +543,16 @@ def compare_lengths_in_regions(config, feature_vec="lengths", source=None):
         log_scale=True,
     )
     # Add number of observations on top of each boxplot
-    total_rows_bio = len(bio_lengths_df)
     print("total_rows_bio ", total_rows_bio)
-    total_rows_synth = len(synth_lengths_df)
     print("total_rows_synth ", total_rows_synth)
-    dict_bio_count = {}
-    dict_synth_count = {}
-    for i, region in enumerate(combined_df["Region"].unique()):
+    for i, region in enumerate(combined_df["parent_region"].unique()):
         # Calculate number of observations
-        bio_data = combined_df[(combined_df["Region"] == region) & (combined_df["Type"] == "Bio")][
-            "Length"
-        ]
+        bio_data = combined_df[
+            (combined_df["parent_region"] == region) & (combined_df["Type"] == "Bio")
+        ][feature_vec]
         synth_data = combined_df[
-            (combined_df["Region"] == region) & (combined_df["Type"] == "Synth")
-        ]["Length"]
+            (combined_df["parent_region"] == region) & (combined_df["Type"] == "Synth")
+        ][feature_vec]
 
         # Perform statistical test (e.g., t-test)
         # _, p_value = stats.ttest_ind(bio_data, synth_data)
@@ -551,7 +573,7 @@ def compare_lengths_in_regions(config, feature_vec="lengths", source=None):
         # Annotate significance above the plot
         plt.text(
             i,
-            combined_df["Length"].max() + 0.1,
+            combined_df[feature_vec].max() + 0.1,
             significance,
             ha="center",
             va="bottom",
@@ -559,28 +581,31 @@ def compare_lengths_in_regions(config, feature_vec="lengths", source=None):
             fontsize=16,
         )
 
-        bio_count = len(bio_data)
-        dict_bio_count[region] = bio_count
-        synth_count = len(synth_data)
-        dict_synth_count[region] = synth_count
+        # bio_count = len(bio_data)
+        # dict_bio_count[region] = bio_count
+        # synth_count = len(synth_data)
+        # dict_synth_count[region] = synth_count
         # Display number of observations on plot
         ax2.text(
             i - barwidth / 2.0,
-            bio_count,
-            f"{bio_count/total_rows_bio:.2f} (n={bio_count})",
-            color="black",
+            dict_bio_count[region],
+            f"{dict_bio_count[region]/total_rows_bio:.2f} (n={dict_bio_count[region]})",
+            color=palette["Bio"],
             fontsize=10,
             rotation=90,
         )  # combined_df['Length'].max()
         ax2_twin.text(
             i + barwidth / 2.0,
-            synth_count,
-            f"{synth_count/total_rows_synth:.2f} (n={synth_count})",
-            color="black",
+            dict_synth_count[region],
+            f"{dict_synth_count[region]/total_rows_synth:.2f} (n={dict_synth_count[region]})",
+            color=palette["Synth"],
             fontsize=10,
             rotation=90,
         )
 
+    # divide all dict_values by total_rows
+    # dict_bio_count_normalized = {k: v / total_rows_bio for k, v in dict_bio_count.items()}
+    # print("dict_bio_count_norm_values ", dict_bio_count_normalized.values())
     ax2.bar(
         dict_bio_count.keys(),
         dict_bio_count.values(),
@@ -613,15 +638,9 @@ def compare_lengths_in_regions(config, feature_vec="lengths", source=None):
     plt.legend()
 
     # Show the plot
-    plt.savefig(config["output"]["path"] + "plots/compare_" + feature_vec + "_distrib.pdf")
+    plt.savefig(out_path + "compare_" + feature_vec + "_distrib.pdf")
     # pylint: disable=logging-not-lazy
-    logging.info(
-        "Saved plot to "
-        + config["output"]["path"]
-        + "plots/compare_"
-        + feature_vec
-        + "_distrib.pdf"
-    )
+    logging.info("Saved plot to " + out_path + "compare_" + feature_vec + "_distrib.pdf")
     plt.close()
 
 
@@ -787,9 +806,8 @@ def compare_connectivity(
     )
     df_axons.to_csv(os.path.split(df_axons_path)[0] + "/connectivity_with_parents_axons.csv")
 
-    # finally, plot the lengths vs connectivity for the parent regions, on twin y axes
+    # finally, plot the local vs l-r connectivity for the parent regions
     fig, ax = plt.subplots()
-    ax2 = ax.twinx()
 
     # Define RGBA color for 'tab:blue' with alpha = 0.5
     tab_green_rgb = mcolors.to_rgb("tab:green")
@@ -805,7 +823,7 @@ def compare_connectivity(
         color=palette["local"],
         label="Local axons connections",
     )
-    ax2.bar(
+    ax.bar(
         df_axons["parent_region"],
         df_axons["connectivity_count"],
         width=0.35,
@@ -815,26 +833,54 @@ def compare_connectivity(
     )
     # set log scale
     ax.set_yscale("log")
-    ax2.set_yscale("log")
 
     ax.set_ylabel("Number of connections")
-    ax2.set_ylabel("Number of connections")
     ax.set_xlabel("Region")
     ax.set_title("Number of connections local axons vs. long range axons from " + source)
 
-    ax.legend(loc="upper left")
-    ax2.legend(loc="upper right")
+    ax.legend(loc="upper right")
     fig.savefig(os.path.split(df_axons_path)[0] + "/connectivity_local_vs_long.png")
 
 
 def plot_results(config, verify=False):
     """Plots all the results."""
+    makedirs(config["output"]["path"] + "plots/", exist_ok=True)
     plot_clusters(config, verify)
     if not verify:
         compare_feature_vectors(config)
         compare_feature_vectors_by_source(config)
-        compare_lengths_in_regions(config, "lengths")
-        compare_lengths_in_regions(config, "terminals")
+        lengths_bio_path = config["output"]["path"]
+        +"axon_lengths_"
+        +str(config["morphologies"]["hierarchy_level"])
+        +".csv"
+        terms_bio_path = config["output"]["path"]
+        +"axon_terminals_"
+        +str(config["morphologies"]["hierarchy_level"])
+        +".csv"
+        try:
+            lengths_synth_path = config["validation"]["synth_axons_path"]
+            +"/axon_lenghts_"
+            +str(config["morphologies"]["hierarchy_level"])
+            +".csv"
+            terms_synth_path = config["validation"]["synth_axons_path"]
+            +"/axon_terminals_"
+            +str(config["morphologies"]["hierarchy_level"])
+            +".csv"
+        except FileNotFoundError:
+            logging.warning("Synth axons path not found, skipping comparison.")
+            sys.exit(1)
+        compare_feat_in_regions(
+            lengths_bio_path,
+            lengths_synth_path,
+            "lengths",
+            out_path=config["output"]["path"] + "plots/",
+        )
+        compare_feat_in_regions(
+            terms_bio_path,
+            terms_synth_path,
+            "terminals",
+            out_path=config["output"]["path"] + "plots/",
+        )
 
 
 if __name__ == "__main__":

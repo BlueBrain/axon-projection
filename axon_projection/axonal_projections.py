@@ -110,22 +110,14 @@ def compute_length_in_regions(
     # concatenate the three edges[FROM_COORDS_COLS] columns into a single column in a list
     edges["source_coords"] = edges[FROM_COORDS_COLS].to_numpy().tolist()
     # add the brain region of the source and target points of the segments, using the atlas lookup
+    # and replace the acronym by the acronym at desired level
     edges["source_region"] = edges["source_coords"].apply(
-        lambda x: get_region(x, brain_regions, region_map)
+        lambda x: dict_acronyms_at_level.get(get_region(x, brain_regions, region_map))
     )
-    # replace the acronym by the acronym at desired level:
-    # if it is not in the dict (which means that no terminal ends in that region),
-    # leave it as it is (dict.get()'s 2nd argument)
-    edges["source_region"] = edges["source_region"].apply(
-        lambda x: dict_acronyms_at_level.get(x, x)
-    )
-    # do the same for the the targets
+    # do the same for the targets
     edges["target_coords"] = edges[TO_COORDS_COLS].to_numpy().tolist()
     edges["target_region"] = edges["target_coords"].apply(
-        lambda x: get_region(x, brain_regions, region_map)
-    )
-    edges["target_region"] = edges["target_region"].apply(
-        lambda x: dict_acronyms_at_level.get(x, x)
+        lambda x: dict_acronyms_at_level.get(get_region(x, brain_regions, region_map))
     )
 
     for region in regions_targeted:
@@ -157,7 +149,6 @@ def process_morphology(
     res_queue_lengths,
     res_queue_all_terms,
     res_queue_check,
-    dict_acronyms_at_level,
 ):
     """Process one morphology, registering the source and target regions."""
     pid = os.getpid()
@@ -236,6 +227,7 @@ def process_morphology(
     # counter of number of out of bound terminal points found
     nb_oob_pts = 0
     rows_all_terms = []
+    dict_acronyms_at_level = {}
     for term_pt in term_pts_list:
         # get the region for each terminal
         try:
@@ -247,6 +239,7 @@ def process_morphology(
             acronym_at_level = get_region_at_level(
                 term_pt_asc, hierarchy_level, atlas_path + "/" + atlas_hierarchy
             )
+            dict_acronyms_at_level[term_pt_asc[0]] = acronym_at_level
             # and store it in the list of targeted regions of this morph
             terminals_regions.append(acronym_at_level)
 
@@ -359,8 +352,6 @@ def create_ap_table(
     rows_morph = []
     # get list of morphologies at morph_dir location
     list_morphs = get_morphology_paths(morph_dir)["morph_path"].values.tolist()
-    # contains the lookup table of acronyms of leaf region to desired hierarchy level of terminals
-    dict_acronyms_at_level = {}
     # dict that contains the ascendant regions for each acronym, and their explicit names.
     # Only used for manual checking/information.
     region_names = {}
@@ -392,7 +383,6 @@ def create_ap_table(
                         res_queue_lengths,
                         res_queue_all_terms,
                         res_queue_check,
-                        dict_acronyms_at_level,
                     )
                 )
             pool.starmap(process_morphology, args_list)
