@@ -849,23 +849,31 @@ def plot_results(config, verify=False):
     if not verify:
         compare_feature_vectors(config)
         compare_feature_vectors_by_source(config)
-        lengths_bio_path = config["output"]["path"]
-        +"axon_lengths_"
-        +str(config["morphologies"]["hierarchy_level"])
-        +".csv"
-        terms_bio_path = config["output"]["path"]
-        +"axon_terminals_"
-        +str(config["morphologies"]["hierarchy_level"])
-        +".csv"
+        lengths_bio_path = (
+            config["output"]["path"]
+            + "axon_lengths_"
+            + str(config["morphologies"]["hierarchy_level"])
+            + ".csv"
+        )
+        terms_bio_path = (
+            config["output"]["path"]
+            + "axon_terminals_"
+            + str(config["morphologies"]["hierarchy_level"])
+            + ".csv"
+        )
         try:
-            lengths_synth_path = config["validation"]["synth_axons_path"]
-            +"/axon_lenghts_"
-            +str(config["morphologies"]["hierarchy_level"])
-            +".csv"
-            terms_synth_path = config["validation"]["synth_axons_path"]
-            +"/axon_terminals_"
-            +str(config["morphologies"]["hierarchy_level"])
-            +".csv"
+            lengths_synth_path = (
+                config["validation"]["synth_axons_path"]
+                + "/axon_lenghts_"
+                + str(config["morphologies"]["hierarchy_level"])
+                + ".csv"
+            )
+            terms_synth_path = (
+                config["validation"]["synth_axons_path"]
+                + "/axon_terminals_"
+                + str(config["morphologies"]["hierarchy_level"])
+                + ".csv"
+            )
         except FileNotFoundError:
             logging.warning("Synth axons path not found, skipping comparison.")
             sys.exit(1)
