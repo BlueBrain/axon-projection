@@ -789,7 +789,6 @@ def compare_tuft_nb_in_regions(
         dict_bio_tuft_props.keys(),
         dict_bio_tuft_props.values(),
         "Clustered tufts",
-        plt.cm.tab20.colors,
         legend=True,
     )
     plot_pie(
@@ -797,7 +796,6 @@ def compare_tuft_nb_in_regions(
         dict_synth_tuft_props.keys(),
         dict_synth_tuft_props.values(),
         "Synthesized tufts",
-        plt.cm.tab20.colors,
     )
 
     # count the number of axons terminating in regions
@@ -828,14 +826,12 @@ def compare_tuft_nb_in_regions(
         dict_synth_count.keys(),
         dict_synth_count.values(),
         "Projections ratio of synthesized axons",
-        plt.cm.tab20.colors,
     )
     plot_pie(
         ax[1][1],
         dict_jiang_props.keys(),
         dict_jiang_props.values(),
         "Projections ratio in Jiang et al. 2020",
-        plt.cm.tab20.colors,
     )
 
     fig.savefig(out_path + "/tuft_piechart.pdf")
@@ -843,13 +839,13 @@ def compare_tuft_nb_in_regions(
     plt.close()
 
 
-def plot_pie(ax, labels, values, title, colors, legend=False):
+def plot_pie(ax, labels, values, title, legend=False):
     """Function to plot a beautiful pie chart with matplotlib."""
     wedges, _, autotexts = ax.pie(
         values,
         labels=None,
         autopct="%1.1f%%",
-        colors=colors,
+        colors=plt.cm.tab20.colors,  # pylint: disable=no-member
         pctdistance=1.15,
     )
     # Customize the autopct text to be outside the slices and colored
