@@ -18,6 +18,13 @@ from scipy.stats import linregress
 from sklearn.metrics import r2_score
 from synthesis_workflow.validation import mvs_score
 
+from axon_projection.choose_hierarchy_level import build_parent_mapping
+from axon_projection.choose_hierarchy_level import find_acronym
+from axon_projection.choose_hierarchy_level import find_atlas_id
+from axon_projection.choose_hierarchy_level import find_parent_acronym
+
+# pylint: disable=too-many-lines
+
 
 def compare_feature_vectors(config):
     """Compares the possible feature vectors for clustering of the morphologies."""
@@ -462,28 +469,6 @@ def compare_feat_in_regions(
     dict_synth_count = {}
     dict_bio_count_per_axon = {}
     dict_synth_count_per_axon = {}
-    # first count the number of morphs terminating in each region
-    # total_rows_bio = len(bio_feat_df)
-    # total_rows_synth = len(synth_feat_df)
-    # list_ROI = []
-    # parent_dict = {}
-    # for target_region in bio_feat_df.columns[2:]:
-    #     if find_parent_acronym(target_region, parent_mapping, regions_subset) is not None:
-    #         list_ROI.append(target_region)
-    #         parent_dict[target_region] = find_parent_acronym(
-    #             target_region, parent_mapping, regions_subset
-    #         )
-    # bio_ROI = bio_feat_df[list_ROI]
-    # bio_ROI.to_csv(out_path + source + "_bio_ROI_all.csv")
-    # synth_ROI = synth_feat_df[list_ROI]
-    # # sum columns that have same parent, and rename the columns to the parent's name
-    # bio_ROI = bio_ROI.groupby(parent_dict, axis=1).sum()
-    # synth_ROI = synth_ROI.groupby(parent_dict, axis=1).sum()
-    # bio_ROI.to_csv(out_path + source + "_bio_ROI.csv")
-    # for region in regions_subset:
-    #     dict_bio_count[region] = len(bio_ROI[bio_ROI[region] > 0.0])
-    #     dict_synth_count[region] = len(synth_ROI[synth_ROI[region] > 0.0])
-    # print(dict_bio_count)
 
     # drop the morph_path and source columns
     bio_feat_df = bio_feat_df.drop(["morph_path", "source"], axis=1)
@@ -539,15 +524,6 @@ def compare_feat_in_regions(
     ax2.spines["right"].set_visible(False)
     ax2.spines["bottom"].set_visible(False)
     combined_df = combined_df[combined_df[feature_vec] > 0.0]
-    # sns.boxplot(
-    #     x="parent_region",
-    #     y=feature_vec,
-    #     hue="Type",
-    #     data=combined_df,
-    #     palette=palette,
-    #     log_scale=True,
-    # )
-
     sns.violinplot(
         x="parent_region",
         y=feature_vec,
@@ -558,8 +534,6 @@ def compare_feat_in_regions(
         log_scale=True,
     )
     # Add number of observations on top of each boxplot
-    # total_rows_bio = len(bio_feat_df)
-    # total_rows_synth = len(synth_feat_df)
     print("total_rows_bio ", total_rows_bio)
     print("total_rows_synth ", total_rows_synth)
     print("num_morphs_bio ", num_morphs_bio)
@@ -647,9 +621,7 @@ def compare_feat_in_regions(
         label="Synthesized",
     )
     # set the y limit as the max value of the two dicts
-    ax2.set_ylim(
-        0, max(max(dict_bio_count_per_axon.values()), max(dict_synth_count_per_axon.values()))
-    )
+    ax2.set_ylim(0, max(*dict_bio_count_per_axon.values(), *dict_synth_count_per_axon.values()))
     # ax2_twin.set_ylabel("Number of observations", color=palette["Synth"])
 
     ax.set_xlabel("Brain region")
@@ -817,6 +789,7 @@ def compare_tuft_nb_in_regions(
         dict_bio_tuft_props.keys(),
         dict_bio_tuft_props.values(),
         "Clustered tufts",
+        plt.cm.tab20.colors,
         legend=True,
     )
     plot_pie(
@@ -824,6 +797,7 @@ def compare_tuft_nb_in_regions(
         dict_synth_tuft_props.keys(),
         dict_synth_tuft_props.values(),
         "Synthesized tufts",
+        plt.cm.tab20.colors,
     )
 
     # count the number of axons terminating in regions
@@ -854,12 +828,14 @@ def compare_tuft_nb_in_regions(
         dict_synth_count.keys(),
         dict_synth_count.values(),
         "Projections ratio of synthesized axons",
+        plt.cm.tab20.colors,
     )
     plot_pie(
         ax[1][1],
         dict_jiang_props.keys(),
         dict_jiang_props.values(),
         "Projections ratio in Jiang et al. 2020",
+        plt.cm.tab20.colors,
     )
 
     fig.savefig(out_path + "/tuft_piechart.pdf")
@@ -867,10 +843,14 @@ def compare_tuft_nb_in_regions(
     plt.close()
 
 
-def plot_pie(ax, labels, values, title, legend=False):
+def plot_pie(ax, labels, values, title, colors, legend=False):
     """Function to plot a beautiful pie chart with matplotlib."""
-    wedges, texts, autotexts = ax.pie(
-        values, labels=None, autopct="%1.1f%%", colors=plt.cm.tab20.colors, pctdistance=1.15
+    wedges, _, autotexts = ax.pie(
+        values,
+        labels=None,
+        autopct="%1.1f%%",
+        colors=colors,
+        pctdistance=1.15,
     )
     # Customize the autopct text to be outside the slices and colored
     for autotext, wedge in zip(autotexts, wedges):
@@ -881,67 +861,6 @@ def plot_pie(ax, labels, values, title, legend=False):
     ax.set_title(title)
     if legend:
         ax.legend(wedges, labels, title="Regions", loc="center right", bbox_to_anchor=(1, 0.5))
-
-
-def find_atlas_ids(node, source_acronyms):
-    """Find the atlas ids corresponding to the source acronyms."""
-    brain_ids = []
-    for source_acronym in source_acronyms:
-        brain_id = find_atlas_id(node, source_acronym)
-        if brain_id is not None:
-            brain_ids.append(brain_id)
-    return brain_ids
-
-
-def find_atlas_id(node, source_acronym):
-    """Find the atlas id corresponding to the source acronym."""
-    if "acronym" in node and node["acronym"] == source_acronym:
-        return node["id"]
-    for child in node.get("children", []):
-        result = find_atlas_id(child, source_acronym)
-        if result is not None:
-            return result
-    return None
-
-
-def find_acronym(node, brain_id):
-    """Find the acronym corresponding to the brain id."""
-    if "id" in node and node["id"] == brain_id:
-        return node["acronym"]
-    for child in node.get("children", []):
-        result = find_acronym(child, brain_id)
-        if result is not None:
-            return result
-    return None
-
-
-def build_parent_mapping(node, parent_acronym=None, mapping=None):
-    """Build a mapping from acronym to parent acronym."""
-    if mapping is None:
-        mapping = {}
-
-    if "acronym" in node:
-        mapping[node["acronym"]] = parent_acronym
-
-    if "children" in node:
-        for child in node["children"]:
-            build_parent_mapping(child, node.get("acronym"), mapping)
-
-    return mapping
-
-
-def find_parent_acronym(acronym, parent_mapping, target_regions):
-    """Find the parent acronym of the given acronym."""
-    # Check if the current acronym is in target regions
-    if acronym in target_regions:
-        return acronym
-    # Check parents up the hierarchy
-    parent = parent_mapping.get(acronym)
-    while parent:
-        if parent in target_regions:
-            return parent
-        parent = parent_mapping.get(parent)
-    return None
 
 
 # pylint: disable=dangerous-default-value
@@ -1061,7 +980,7 @@ def compare_lengths_vs_connectivity(
     synth_conns = np.array(list(dict_synth_conns.values()))
 
     # Performing linear regression
-    slope, intercept, r_value, p_value, std_err = linregress(bio_lengths, synth_conns)
+    slope, intercept, r_value, _, _ = linregress(bio_lengths, synth_conns)
     # Creating the regression line
     regression_line = slope * bio_lengths + intercept
     ax.plot(

@@ -63,3 +63,64 @@ def get_region_at_level(list_asc, level, hierarchy_file):
             return acr
     # if none was found, repeat process with hierarchy level above the one specified
     return get_region_at_level(list_asc, level - 1, hierarchy_file)
+
+
+def find_atlas_ids(node, source_acronyms):
+    """Find the atlas ids corresponding to the source acronyms."""
+    brain_ids = []
+    for source_acronym in source_acronyms:
+        brain_id = find_atlas_id(node, source_acronym)
+        if brain_id is not None:
+            brain_ids.append(brain_id)
+    return brain_ids
+
+
+def find_atlas_id(node, source_acronym):
+    """Find the atlas id corresponding to the source acronym."""
+    if "acronym" in node and node["acronym"] == source_acronym:
+        return node["id"]
+    for child in node.get("children", []):
+        result = find_atlas_id(child, source_acronym)
+        if result is not None:
+            return result
+    return None
+
+
+def find_acronym(node, brain_id):
+    """Find the acronym corresponding to the brain id."""
+    if "id" in node and node["id"] == brain_id:
+        return node["acronym"]
+    for child in node.get("children", []):
+        result = find_acronym(child, brain_id)
+        if result is not None:
+            return result
+    return None
+
+
+def build_parent_mapping(node, parent_acronym=None, mapping=None):
+    """Build a mapping from acronym to parent acronym."""
+    if mapping is None:
+        mapping = {}
+
+    if "acronym" in node:
+        mapping[node["acronym"]] = parent_acronym
+
+    if "children" in node:
+        for child in node["children"]:
+            build_parent_mapping(child, node.get("acronym"), mapping)
+
+    return mapping
+
+
+def find_parent_acronym(acronym, parent_mapping, target_regions):
+    """Find the parent acronym of the given acronym."""
+    # Check if the current acronym is in target regions
+    if acronym in target_regions:
+        return acronym
+    # Check parents up the hierarchy
+    parent = parent_mapping.get(acronym)
+    while parent:
+        if parent in target_regions:
+            return parent
+        parent = parent_mapping.get(parent)
+    return None
