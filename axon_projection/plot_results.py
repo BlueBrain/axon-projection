@@ -4,6 +4,7 @@ import configparser
 import json
 import logging
 import os
+import pathlib
 import sys
 from os import makedirs
 
@@ -13,6 +14,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib.colors import LogNorm
+from scipy.stats import linregress
 from sklearn.metrics import r2_score
 from synthesis_workflow.validation import mvs_score
 
@@ -447,36 +449,41 @@ def compare_feat_in_regions(
     bio_feat_df = bio_feat_df[bio_feat_df["source"] == source]
     synth_feat_df = synth_feat_df[synth_feat_df["source"] == source]
 
+    num_morphs_bio = len(bio_feat_df)
+    num_morphs_synth = len(synth_feat_df)
+
     # build the parent mapping
     with open(atlas_hierarchy, encoding="utf-8") as f:
         hierarchy_data = json.load(f)
     hierarchy = hierarchy_data["msg"][0]
     parent_mapping = build_parent_mapping(hierarchy)
 
-    # first count the number of morphs terminating in each region
-    total_rows_bio = len(bio_feat_df)
-    total_rows_synth = len(synth_feat_df)
-    list_ROI = []
-    parent_dict = {}
-    for target_region in bio_feat_df.columns[2:]:
-        if find_parent_acronym(target_region, parent_mapping, regions_subset) is not None:
-            list_ROI.append(target_region)
-            parent_dict[target_region] = find_parent_acronym(
-                target_region, parent_mapping, regions_subset
-            )
-    bio_ROI = bio_feat_df[list_ROI]
-    bio_ROI.to_csv(out_path + source + "_bio_ROI_all.csv")
-    synth_ROI = synth_feat_df[list_ROI]
-    # sum columns that have same parent, and rename the columns to the parent's name
-    bio_ROI = bio_ROI.groupby(parent_dict, axis=1).sum()
-    synth_ROI = synth_ROI.groupby(parent_dict, axis=1).sum()
-    bio_ROI.to_csv(out_path + source + "_bio_ROI.csv")
     dict_bio_count = {}
     dict_synth_count = {}
-    for region in regions_subset:
-        dict_bio_count[region] = len(bio_ROI[bio_ROI[region] > 0.0])
-        dict_synth_count[region] = len(synth_ROI[synth_ROI[region] > 0.0])
-    print(dict_bio_count)
+    dict_bio_count_per_axon = {}
+    dict_synth_count_per_axon = {}
+    # first count the number of morphs terminating in each region
+    # total_rows_bio = len(bio_feat_df)
+    # total_rows_synth = len(synth_feat_df)
+    # list_ROI = []
+    # parent_dict = {}
+    # for target_region in bio_feat_df.columns[2:]:
+    #     if find_parent_acronym(target_region, parent_mapping, regions_subset) is not None:
+    #         list_ROI.append(target_region)
+    #         parent_dict[target_region] = find_parent_acronym(
+    #             target_region, parent_mapping, regions_subset
+    #         )
+    # bio_ROI = bio_feat_df[list_ROI]
+    # bio_ROI.to_csv(out_path + source + "_bio_ROI_all.csv")
+    # synth_ROI = synth_feat_df[list_ROI]
+    # # sum columns that have same parent, and rename the columns to the parent's name
+    # bio_ROI = bio_ROI.groupby(parent_dict, axis=1).sum()
+    # synth_ROI = synth_ROI.groupby(parent_dict, axis=1).sum()
+    # bio_ROI.to_csv(out_path + source + "_bio_ROI.csv")
+    # for region in regions_subset:
+    #     dict_bio_count[region] = len(bio_ROI[bio_ROI[region] > 0.0])
+    #     dict_synth_count[region] = len(synth_ROI[synth_ROI[region] > 0.0])
+    # print(dict_bio_count)
 
     # drop the morph_path and source columns
     bio_feat_df = bio_feat_df.drop(["morph_path", "source"], axis=1)
@@ -488,7 +495,8 @@ def compare_feat_in_regions(
     synth_feat_df = synth_feat_df.melt(var_name="Region", value_name=feature_vec)
     bio_feat_df = bio_feat_df[bio_feat_df[feature_vec] > 0.0]
     synth_feat_df = synth_feat_df[synth_feat_df[feature_vec] > 0.0]
-
+    total_rows_bio = len(bio_feat_df)
+    total_rows_synth = len(synth_feat_df)
     # bio_feat_df = bio_feat_df.reset_index()
     # synth_feat_df = synth_feat_df.reset_index()
     bio_feat_df["parent_region"] = bio_feat_df["Region"].apply(
@@ -519,19 +527,26 @@ def compare_feat_in_regions(
     plt.figure(figsize=(10, 10))
     # for the bar plot for number of axons
     ax2 = plt.subplot(3, 1, 1)
-    ax2_twin = ax2.twinx()
+    # ax2_twin = ax2.twinx()
     barwidth = 0.4
     # for the boxplot or violinplot
     ax = plt.subplot(3, 1, (2, 3), sharex=ax2)
+    # hide the top and right spines
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax2.spines["top"].set_visible(False)
+    ax2.spines["right"].set_visible(False)
+    ax2.spines["bottom"].set_visible(False)
     combined_df = combined_df[combined_df[feature_vec] > 0.0]
-    sns.boxplot(
-        x="parent_region",
-        y=feature_vec,
-        hue="Type",
-        data=combined_df,
-        palette=palette,
-        log_scale=True,
-    )
+    # sns.boxplot(
+    #     x="parent_region",
+    #     y=feature_vec,
+    #     hue="Type",
+    #     data=combined_df,
+    #     palette=palette,
+    #     log_scale=True,
+    # )
 
     sns.violinplot(
         x="parent_region",
@@ -543,8 +558,12 @@ def compare_feat_in_regions(
         log_scale=True,
     )
     # Add number of observations on top of each boxplot
+    # total_rows_bio = len(bio_feat_df)
+    # total_rows_synth = len(synth_feat_df)
     print("total_rows_bio ", total_rows_bio)
     print("total_rows_synth ", total_rows_synth)
+    print("num_morphs_bio ", num_morphs_bio)
+    print("num_morphs_synth ", num_morphs_synth)
     for i, region in enumerate(combined_df["parent_region"].unique()):
         # Calculate number of observations
         bio_data = combined_df[
@@ -554,8 +573,7 @@ def compare_feat_in_regions(
             (combined_df["parent_region"] == region) & (combined_df["Type"] == "Synth")
         ][feature_vec]
 
-        # Perform statistical test (e.g., t-test)
-        # _, p_value = stats.ttest_ind(bio_data, synth_data)
+        # Perform statistical test (mvs)
         try:
             mvs = mvs_score(bio_data, synth_data)
         except Exception as e:  # pylint: disable=broad-except
@@ -565,6 +583,9 @@ def compare_feat_in_regions(
         # Define significance levels
         if mvs < 0.1:
             print("significant")
+            significance = "**"
+        elif mvs < 0.5:
+            print("non-random")
             significance = "*"
         else:
             print("not significant")
@@ -581,23 +602,25 @@ def compare_feat_in_regions(
             fontsize=16,
         )
 
-        # bio_count = len(bio_data)
-        # dict_bio_count[region] = bio_count
-        # synth_count = len(synth_data)
-        # dict_synth_count[region] = synth_count
+        bio_count = len(bio_data)
+        dict_bio_count[region] = bio_count
+        dict_bio_count_per_axon[region] = bio_count / num_morphs_bio
+        synth_count = len(synth_data)
+        dict_synth_count[region] = synth_count
+        dict_synth_count_per_axon[region] = synth_count / num_morphs_synth
         # Display number of observations on plot
         ax2.text(
             i - barwidth / 2.0,
-            dict_bio_count[region],
-            f"{dict_bio_count[region]/total_rows_bio:.2f} (n={dict_bio_count[region]})",
+            dict_bio_count_per_axon[region],
+            f"{dict_bio_count_per_axon[region]:.2f} (n={dict_bio_count[region]})",
             color=palette["Bio"],
             fontsize=10,
             rotation=90,
         )  # combined_df['Length'].max()
-        ax2_twin.text(
+        ax2.text(
             i + barwidth / 2.0,
-            dict_synth_count[region],
-            f"{dict_synth_count[region]/total_rows_synth:.2f} (n={dict_synth_count[region]})",
+            dict_synth_count_per_axon[region],
+            f"{dict_synth_count_per_axon[region]:.2f} (n={dict_synth_count[region]})",
             color=palette["Synth"],
             fontsize=10,
             rotation=90,
@@ -607,23 +630,27 @@ def compare_feat_in_regions(
     # dict_bio_count_normalized = {k: v / total_rows_bio for k, v in dict_bio_count.items()}
     # print("dict_bio_count_norm_values ", dict_bio_count_normalized.values())
     ax2.bar(
-        dict_bio_count.keys(),
-        dict_bio_count.values(),
+        dict_bio_count_per_axon.keys(),
+        dict_bio_count_per_axon.values(),
         width=-barwidth,
         align="edge",
         color=palette["Bio"],
-        label="Bio",
+        label="Reconstructed",
     )
-    ax2.set_ylabel("Terminating axons", color=palette["Bio"])
-    ax2_twin.bar(
-        dict_synth_count.keys(),
-        dict_synth_count.values(),
+    ax2.set_ylabel("Number of observations per axon")  # , color=palette["Bio"])
+    ax2.bar(
+        dict_synth_count_per_axon.keys(),
+        dict_synth_count_per_axon.values(),
         width=barwidth,
         align="edge",
         color=palette["Synth"],
-        label="Synth",
+        label="Synthesized",
     )
-    ax2_twin.set_ylabel("Terminating axons", color=palette["Synth"])
+    # set the y limit as the max value of the two dicts
+    ax2.set_ylim(
+        0, max(max(dict_bio_count_per_axon.values()), max(dict_synth_count_per_axon.values()))
+    )
+    # ax2_twin.set_ylabel("Number of observations", color=palette["Synth"])
 
     ax.set_xlabel("Brain region")
     if feature_vec == "lengths":
@@ -642,6 +669,250 @@ def compare_feat_in_regions(
     # pylint: disable=logging-not-lazy
     logging.info("Saved plot to " + out_path + "compare_" + feature_vec + "_distrib.pdf")
     plt.close()
+
+
+def compare_tuft_nb_in_regions(
+    df_bio_path,
+    df_synth_path,
+    source="MOp5",
+    regions_subset=["MOp", "MOs", "SSp", "SSs", "CP", "PG", "SPVI"],
+    out_path="./",
+    atlas_hierarchy="/gpfs/bbp.cscs.ch/project/proj148/scratch/"
+    "circuits/20240531/.atlas/hierarchy.json",
+):
+    """Compares the lengths in region between bio and synth axons."""
+    os.makedirs(out_path, exist_ok=True)
+    # Define RGBA color for 'tab:blue' with alpha = 0.5
+    tab_blue_rgb = mcolors.to_rgb("tab:blue")
+    tab_red_rgb = mcolors.to_rgb("tab:red")
+    # Define the color palette
+    palette = {"Bio": tab_blue_rgb, "Synth": tab_red_rgb}
+    barwidth = 0.4
+    # build the parent mapping
+    with open(atlas_hierarchy, encoding="utf-8") as f:
+        hierarchy_data = json.load(f)
+    hierarchy = hierarchy_data["msg"][0]
+    parent_mapping = build_parent_mapping(hierarchy)
+    with pathlib.Path(df_bio_path).open(mode="r", encoding="utf-8") as f:
+        tuft_counts_bio_df = pd.DataFrame(json.load(f))
+    nb_target_pts_synth_df = pd.read_csv(df_synth_path, index_col=0)
+    # find in the hierarchy file the node with acronym == source, and get its atlas_id
+    source_brain_id = find_atlas_id(hierarchy, source)
+    # keep only the rows where target_pop_id starts with source_brain_id
+    tuft_counts_bio_df = tuft_counts_bio_df[
+        tuft_counts_bio_df["target_population_id"].str.startswith(str(source_brain_id) + "_")
+    ]
+    # add the target_brain_id column, which is what is after the last '_'
+    tuft_counts_bio_df["target_brain_id"] = (
+        tuft_counts_bio_df["target_population_id"].str.split("_").str[-1].astype(int)
+    )
+    # and find the corresponding acronym
+    tuft_counts_bio_df["target_acronym"] = tuft_counts_bio_df["target_brain_id"].apply(
+        lambda x: find_acronym(hierarchy, x)
+    )
+    # find the parent_region within the region subset for these acronyms
+    tuft_counts_bio_df["parent_region"] = tuft_counts_bio_df["target_acronym"].apply(
+        lambda x: find_parent_acronym(x, parent_mapping, regions_subset)
+    )
+    # compute here the total number of tufts for this source region
+    nb_tufts_bio = tuft_counts_bio_df["number_of_tufts"].sum()
+    # drop the rows if their parent_region is na
+    tuft_counts_bio_df = tuft_counts_bio_df.dropna(subset=["parent_region"])
+
+    nb_target_pts_synth_df = nb_target_pts_synth_df[
+        nb_target_pts_synth_df["source_brain_region_id"] == source_brain_id
+    ]
+    nb_tufts_synth = nb_target_pts_synth_df["num_tufts_to_grow"].sum()
+    nb_target_pts_synth_df["target_acronym"] = nb_target_pts_synth_df[
+        "target_brain_region_id"
+    ].apply(lambda x: find_acronym(hierarchy, x))
+    nb_target_pts_synth_df["parent_region"] = nb_target_pts_synth_df["target_acronym"].apply(
+        lambda x: find_parent_acronym(x, parent_mapping, regions_subset)
+    )
+    nb_target_pts_synth_df = nb_target_pts_synth_df.dropna(subset=["parent_region"])
+
+    dict_bio_tuft_counts = {}
+    dict_bio_tuft_props = {}
+    dict_synth_tuft_counts = {}
+    dict_synth_tuft_props = {}
+    for region in regions_subset:
+        dict_bio_tuft_counts[region] = tuft_counts_bio_df[
+            tuft_counts_bio_df["parent_region"] == region
+        ]["number_of_tufts"].sum()
+        dict_bio_tuft_props[region] = dict_bio_tuft_counts[region] / nb_tufts_bio
+        dict_synth_tuft_counts[region] = nb_target_pts_synth_df[
+            nb_target_pts_synth_df["parent_region"] == region
+        ]["num_tufts_to_grow"].sum()
+        dict_synth_tuft_props[region] = dict_synth_tuft_counts[region] / nb_tufts_synth
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+    # ax2 = ax.twinx()
+    ax.bar(
+        dict_bio_tuft_props.keys(),
+        dict_bio_tuft_props.values(),
+        color=palette["Bio"],
+        width=-barwidth,
+        align="edge",
+    )
+    ax.bar(
+        dict_synth_tuft_props.keys(),
+        dict_synth_tuft_props.values(),
+        color=palette["Synth"],
+        width=barwidth,
+        align="edge",
+    )
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    # show the proportions as text above the bars
+    for r, region in enumerate(dict_bio_tuft_props.keys()):
+        ax.text(
+            r - barwidth / 2.0,
+            dict_bio_tuft_props[region],
+            f"{dict_bio_tuft_props[region]:.2f} (n={dict_bio_tuft_counts[region]})",
+            color=palette["Bio"],
+            fontsize=10,
+            rotation=90,
+        )
+        ax.text(
+            r + barwidth / 2.0,
+            dict_synth_tuft_props[region],
+            f"{dict_synth_tuft_props[region]:.2f} (n={dict_synth_tuft_counts[region]})",
+            color=palette["Synth"],
+            fontsize=10,
+            rotation=90,
+        )
+    ax.set_ylim(0, 1)
+    # ax2.set_ylim(0, 1)
+    ax.set_ylabel("Proportion of tufts clustered")
+    # ax2.set_ylabel("Number of tufts synthesized")
+    ax.set_xlabel("Region")
+    ax.set_title("Proportion of tufts in regions")
+    fig.legend(["Reconstructed", "Synthesized"], loc="upper right")
+    fig.savefig(out_path + "/tuft_counts.pdf")
+
+    logging.info("Saved tuft counts plot to %s", out_path + "/tuft_counts.pdf")
+    plt.close()
+
+    # plot the dict_props also as piecharts
+    fig, ax = plt.subplots(2, 2, figsize=(10, 10))
+    # add an "Other" category, which will be 1 minus the rest
+    dict_bio_tuft_props["Other"] = 1 - sum(dict_bio_tuft_props.values())
+    dict_synth_tuft_props["Other"] = 1 - sum(dict_synth_tuft_props.values())
+    dict_jiang_props = {
+        "Isocortex": 0.212,
+        "OLF": 0.0223 * 12.0 / 42.0,
+        "CTXsp": 0.0279 * 12.0 / 42.0,
+        "STR": 0.25,
+        "PAL": 0.052,
+        "TH": 0.047,
+        "HY": 0.025,
+        "MB": 0.183,
+        "PG": 0.097,
+        "MY": 0.121,
+    }
+    plot_pie(
+        ax[0][0],
+        dict_bio_tuft_props.keys(),
+        dict_bio_tuft_props.values(),
+        "Clustered tufts",
+        legend=True,
+    )
+    plot_pie(
+        ax[0][1],
+        dict_synth_tuft_props.keys(),
+        dict_synth_tuft_props.values(),
+        "Synthesized tufts",
+    )
+
+    # count the number of axons terminating in regions
+    list_ROI = []
+    parent_dict = {}
+    dict_synth_count = {}
+    synth_feat_df = pd.read_csv(
+        os.path.split(df_synth_path)[0] + "/axon_lengths_8.csv", index_col=0
+    )
+    synth_feat_df = synth_feat_df[synth_feat_df["source"] == source]
+    for target_region in synth_feat_df.columns[2:]:
+        if find_parent_acronym(target_region, parent_mapping, regions_subset) is not None:
+            list_ROI.append(target_region)
+            parent_dict[target_region] = find_parent_acronym(
+                target_region, parent_mapping, regions_subset
+            )
+    synth_ROI = synth_feat_df[list_ROI]
+    synth_ROI.to_csv(out_path + source + "_synth_ROI_all.csv")
+    # sum columns that have same parent, and rename the columns to the parent's name
+    synth_ROI = synth_ROI.groupby(parent_dict, axis=1).sum()
+    synth_ROI.to_csv(out_path + source + "_synth_ROI.csv")
+    for region in regions_subset:
+        dict_synth_count[region] = len(synth_ROI[synth_ROI[region] > 0.0])
+    print(dict_synth_count)
+
+    plot_pie(
+        ax[1][0],
+        dict_synth_count.keys(),
+        dict_synth_count.values(),
+        "Projections ratio of synthesized axons",
+    )
+    plot_pie(
+        ax[1][1],
+        dict_jiang_props.keys(),
+        dict_jiang_props.values(),
+        "Projections ratio in Jiang et al. 2020",
+    )
+
+    fig.savefig(out_path + "/tuft_piechart.pdf")
+    logging.info("Saved tuft piechart plot to %s", out_path + "/tuft_piechart.pdf")
+    plt.close()
+
+
+def plot_pie(ax, labels, values, title, legend=False):
+    """Function to plot a beautiful pie chart with matplotlib."""
+    wedges, texts, autotexts = ax.pie(
+        values, labels=None, autopct="%1.1f%%", colors=plt.cm.tab20.colors, pctdistance=1.15
+    )
+    # Customize the autopct text to be outside the slices and colored
+    for autotext, wedge in zip(autotexts, wedges):
+        autotext.set_color(wedge.get_facecolor())
+        autotext.set_fontsize(10)
+        autotext.set_weight("bold")
+    ax.axis("equal")  # Equal aspect ratio ensures that pie is drawn as a circle.
+    ax.set_title(title)
+    if legend:
+        ax.legend(wedges, labels, title="Regions", loc="center right", bbox_to_anchor=(1, 0.5))
+
+
+def find_atlas_ids(node, source_acronyms):
+    """Find the atlas ids corresponding to the source acronyms."""
+    brain_ids = []
+    for source_acronym in source_acronyms:
+        brain_id = find_atlas_id(node, source_acronym)
+        if brain_id is not None:
+            brain_ids.append(brain_id)
+    return brain_ids
+
+
+def find_atlas_id(node, source_acronym):
+    """Find the atlas id corresponding to the source acronym."""
+    if "acronym" in node and node["acronym"] == source_acronym:
+        return node["id"]
+    for child in node.get("children", []):
+        result = find_atlas_id(child, source_acronym)
+        if result is not None:
+            return result
+    return None
+
+
+def find_acronym(node, brain_id):
+    """Find the acronym corresponding to the brain id."""
+    if "id" in node and node["id"] == brain_id:
+        return node["acronym"]
+    for child in node.get("children", []):
+        result = find_acronym(child, brain_id)
+        if result is not None:
+            return result
+    return None
 
 
 def build_parent_mapping(node, parent_acronym=None, mapping=None):
@@ -724,6 +995,16 @@ def compare_lengths_vs_connectivity(
     df_bio.to_csv(os.path.split(df_bio_path)[0] + "/lengths_T.csv")
     df_synth.to_csv(os.path.split(df_synth_path)[0] + "/connectivity_with_parents.csv")
 
+    dict_bio_lengths = {}
+    dict_synth_conns = {}
+    for region in target_regions:
+        dict_bio_lengths[region] = df_bio[df_bio["parent_region"] == region]["total_length"].sum()
+        dict_synth_conns[region] = df_synth[df_synth["parent_region"] == region][
+            "connectivity_count"
+        ].sum()
+
+    print(dict_bio_lengths)
+    print(dict_synth_conns)
     # finally, plot the lengths vs connectivity for the parent regions, on twin y axes
     fig, ax = plt.subplots()
     ax2 = ax.twinx()
@@ -733,35 +1014,92 @@ def compare_lengths_vs_connectivity(
     tab_red_rgb = mcolors.to_rgb("tab:red")
     # Define the color palette
     palette = {"Bio": tab_blue_rgb, "Synth": tab_red_rgb}
-
     ax.bar(
-        df_bio["parent_region"],
-        df_bio["total_length"],
+        dict_bio_lengths.keys(),
+        dict_bio_lengths.values(),
         width=-0.35,
         align="edge",
         color=palette["Bio"],
         label="Bio lengths",
     )
     ax2.bar(
-        df_synth["parent_region"],
-        df_synth["connectivity_count"],
+        dict_synth_conns.keys(),
+        dict_synth_conns.values(),
         width=0.35,
         align="edge",
         color=palette["Synth"],
         label="Synth connections",
     )
     # set log scale
-    ax.set_yscale("log")
-    ax2.set_yscale("log")
+    # ax.set_yscale("log")
+    # ax2.set_yscale("log")
+    ax.spines["top"].set_visible(False)
+    ax2.spines["top"].set_visible(False)
 
     ax.set_ylabel(r"Total axon length [$\mu$m]")
     ax2.set_ylabel("Number of connections")
     ax.set_xlabel("Region")
+    # rotate xticks labels
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
     ax.set_title("Total axon length vs. number of connections in " + source)
 
     ax.legend(loc="upper left")
     ax2.legend(loc="upper right")
-    fig.savefig(os.path.split(df_synth_path)[0] + "/lengths_vs_connectivity.png")
+    fig.savefig(os.path.split(df_synth_path)[0] + "/lengths_vs_connectivity.pdf")
+
+    # do a scatter plot of lengths vs connectivity, each point is a region
+    fig, ax = plt.subplots(figsize=(5, 5))
+    ax.scatter(dict_bio_lengths.values(), dict_synth_conns.values())
+    # add a label that gives the region for each point
+    for i, region in enumerate(dict_bio_lengths.keys()):
+        ax.annotate(region, (dict_bio_lengths[region], dict_synth_conns[region]), fontsize=8)
+    # set log scale
+    # ax.set_yscale("log")
+    # ax.set_xscale("log")
+    # plot also a linear regression line
+    bio_lengths = np.array(list(dict_bio_lengths.values()))
+    synth_conns = np.array(list(dict_synth_conns.values()))
+
+    # Performing linear regression
+    slope, intercept, r_value, p_value, std_err = linregress(bio_lengths, synth_conns)
+    # Creating the regression line
+    regression_line = slope * bio_lengths + intercept
+    ax.plot(
+        bio_lengths, regression_line, color="red", label=f"Fit line: y={slope:.2f}x+{intercept:.2f}"
+    )
+    # Adding the slope and R^2 value
+    textstr = f"Slope: {slope:.2f}\n$R^2$: {r_value**2:.2f}"
+    ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=10, verticalalignment="top")
+
+    ax.set_xlabel(r"Total axon length [$\mu$m]")
+    ax.set_ylabel("Number of connections")
+    ax.set_title("Total axon length vs. number of connections in " + source)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    fig.savefig(os.path.split(df_synth_path)[0] + "/lengths_vs_connectivity_scatter.pdf")
+
+    # save also a log version
+    # Clear the previous regression line and text
+    fig, ax = plt.subplots(figsize=(3, 3))
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    # Recreate the scatter plot
+    ax.scatter(bio_lengths, synth_conns)
+    for i, region in enumerate(dict_bio_lengths.keys()):
+        ax.annotate(region, (bio_lengths[i], synth_conns[i]), fontsize=8)
+    ax.set_yscale("log")
+    ax.set_xscale("log")
+    # Plot the regression line on log-log scale
+    ax.plot(
+        np.sort(bio_lengths),
+        np.sort(regression_line),
+        color="red",
+        label=f"Fit line: y={10**intercept:.2f}x^{slope:.2f}",
+    )
+    # Adding the slope and R^2 value
+    textstr = f"Slope: {slope:.2f}\n$R^2$: {r_value**2:.2f}"
+    ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=10, verticalalignment="top")
+    fig.savefig(os.path.split(df_synth_path)[0] + "/lengths_vs_connectivity_scatter_log.pdf")
 
 
 # pylint: disable=dangerous-default-value
@@ -832,14 +1170,18 @@ def compare_connectivity(
         label="Long range axons connections",
     )
     # set log scale
-    ax.set_yscale("log")
+    # ax.set_yscale("log")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
     ax.set_ylabel("Number of connections")
     ax.set_xlabel("Region")
+    # rotate xticks labels
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
     ax.set_title("Number of connections local axons vs. long range axons from " + source)
 
     ax.legend(loc="upper right")
-    fig.savefig(os.path.split(df_axons_path)[0] + "/connectivity_local_vs_long.png")
+    fig.savefig(os.path.split(df_axons_path)[0] + "/connectivity_local_vs_long.pdf")
 
 
 def plot_results(config, verify=False):
