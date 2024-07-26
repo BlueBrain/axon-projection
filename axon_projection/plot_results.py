@@ -1191,12 +1191,10 @@ def plot_hemispheres(
     )
 
     # Define colors for each parent_region
-    colors = plt.cm.tab20.colors
-    color_dict = {
-        region: color for region, color in zip(tuft_counts_bio_df["parent_region"].unique(), colors)
-    }
+    colors = plt.cm.tab20.colors  # pylint: disable=no-member
+    color_dict = dict(zip(tuft_counts_bio_df["parent_region"].unique(), colors))
     source_hemispheres = tuft_counts_bio_df["source_hemisphere"].unique()
-    fig, ax = plt.subplots(2, 2, figsize=(10, 10))
+    _, ax = plt.subplots(2, 2, figsize=(10, 10))
 
     for t, typ in enumerate(["bio", "synth"]):
         # Create pie charts

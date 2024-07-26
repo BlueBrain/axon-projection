@@ -142,8 +142,7 @@ def process_morphology(
     res_queue_check,
 ):
     """Process one morphology, registering the source and target regions."""
-    pid = os.getpid()
-    logging.info("Processing %s in process %s", morph_file, pid)
+    logging.info("Processing %s in process %s", morph_file, os.getpid())
     res_morph = {"morph_path": morph_file, "bad_morph": 0, "oob_morph": 0, "morph_wo_axon": 0}
     # load morpho
     try:
@@ -159,7 +158,7 @@ def process_morphology(
 
     # find the source region
     try:
-        source_region, source_region_h, region_names = find_and_register_source_region(
+        _, source_region_h, region_names = find_and_register_source_region(
             morph,
             region_names,
             brain_regions,

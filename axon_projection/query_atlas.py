@@ -55,7 +55,6 @@ def get_region(x, brain_regions, region_map, value="acronym", with_ascendants=Fa
         reg_hemisphere = get_hemisphere(x, brain_regions.bbox)
     except VoxcellError as e:
         logging.debug("Voxcell error: %s", repr(e))
-        pass
     except Exception as e:  # pylint: disable=broad-except
         logging.debug("Unexpected error: %s", repr(e))
     return reg, reg_hemisphere
