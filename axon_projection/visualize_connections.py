@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from axon_projection.query_atlas import load_atlas
+from axon_projection.query_atlas import without_hemisphere
 
 
 def get_hierarchy_level(acronym, ascendants):
@@ -50,7 +51,9 @@ def create_ascendance_table(region_map, regions):
     for region in regions:
         if region not in table:
             table[region] = region_map.get(
-                region_map.find(region, "acronym").pop(), "acronym", with_ascendants=True
+                region_map.find(without_hemisphere(region), "acronym").pop(),
+                "acronym",
+                with_ascendants=True,
             )
     return table
 
@@ -131,6 +134,8 @@ def create_conn_graphs(config, verify=False):
     conn_data = pd.read_csv(conn_data_path)
     sources = conn_data.source.unique().tolist()  # list of unique sources
     targets = conn_data.target_region.unique().tolist()  # list of unique targets
+    # sources_wo_hemisphere = [without_hemisphere(s) for s in sources]
+    # targets_wo_hemisphere = [without_hemisphere(t) for t in targets]
 
     # create once the ascendance table for the sources and targets
     # needed to find the common ancestor
@@ -181,7 +186,10 @@ def create_conn_graphs(config, verify=False):
                 for node in inter_nodes:
                     # minus sign is to invert the hierarchical direction (put root at the top)
                     G.nodes[node]["hierarchy"] = -get_hierarchy_level(
-                        node, create_ascendance_table(region_map, [node])[node]
+                        without_hemisphere(node),
+                        create_ascendance_table(region_map, [without_hemisphere(node)])[
+                            without_hemisphere(node)
+                        ],
                     )
 
             node_colormap = []

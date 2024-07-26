@@ -1,6 +1,8 @@
 """Helper functions to read the brain regions hierarchy, and extract acronyms at desired depth."""
 import json
 
+from axon_projection.query_atlas import region_hemisphere
+
 
 def extract_acronyms_at_level(data, level):
     """Return acronyms at given level.
@@ -97,17 +99,20 @@ def find_acronym(node, brain_id):
     return None
 
 
-def build_parent_mapping(node, parent_acronym=None, mapping=None):
+def build_parent_mapping(node, parent_acronym=None, mapping=None, with_hemisphere=False):
     """Build a mapping from acronym to parent acronym."""
     if mapping is None:
         mapping = {}
 
     if "acronym" in node:
-        mapping[node["acronym"]] = parent_acronym
+        if not with_hemisphere:
+            mapping[node["acronym"]] = parent_acronym
+        else:
+            mapping[node["acronym"]] = parent_acronym + "_" + region_hemisphere(node["acronym"])
 
     if "children" in node:
         for child in node["children"]:
-            build_parent_mapping(child, node.get("acronym"), mapping)
+            build_parent_mapping(child, node.get("acronym"), mapping, with_hemisphere)
 
     return mapping
 

@@ -18,11 +18,13 @@ from axon_synthesis.utils import get_morphology_paths
 from axon_synthesis.utils import neurite_to_pts
 from neurom.core.morphology import Section
 from neurom.core.morphology import iter_sections
-from voxcell.exceptions import VoxcellError
 
 from axon_projection.choose_hierarchy_level import get_region_at_level
 from axon_projection.compute_morphometrics import get_axons
+from axon_projection.query_atlas import get_hemisphere
+from axon_projection.query_atlas import get_precomputed_region
 from axon_projection.query_atlas import load_atlas
+from axon_projection.query_atlas import without_hemisphere
 
 
 def basal_dendrite_filter(n):
@@ -74,19 +76,8 @@ def find_and_register_source_region(
             source_names[-hierarchy_level - 1 :],
         ]
 
-    return source_region, region_names
-
-
-def get_region(x, brain_regions, region_map, value="acronym", with_ascendants=False):
-    """Get the brain region name of the point x."""
-    reg = "OOB"
-    try:
-        reg = region_map.get(brain_regions.lookup(x), value, with_ascendants=with_ascendants)
-    except VoxcellError:
-        pass
-    except Exception as e:  # pylint: disable=broad-except
-        logging.debug("Unexpected error: %s", repr(e))
-    return reg
+    source_with_hemisphere = source_region + "_" + get_hemisphere(source_pos, brain_regions.bbox)
+    return source_region, source_with_hemisphere, region_names
 
 
 def compute_length_in_regions(
@@ -112,12 +103,12 @@ def compute_length_in_regions(
     # add the brain region of the source and target points of the segments, using the atlas lookup
     # and replace the acronym by the acronym at desired level
     edges["source_region"] = edges["source_coords"].apply(
-        lambda x: dict_acronyms_at_level.get(get_region(x, brain_regions, region_map))
+        lambda x: get_precomputed_region(x, brain_regions, region_map, dict_acronyms_at_level)
     )
     # do the same for the targets
     edges["target_coords"] = edges[TO_COORDS_COLS].to_numpy().tolist()
     edges["target_region"] = edges["target_coords"].apply(
-        lambda x: dict_acronyms_at_level.get(get_region(x, brain_regions, region_map))
+        lambda x: get_precomputed_region(x, brain_regions, region_map, dict_acronyms_at_level)
     )
 
     for region in regions_targeted:
@@ -168,7 +159,7 @@ def process_morphology(
 
     # find the source region
     try:
-        source_region, region_names = find_and_register_source_region(
+        source_region, source_region_h, region_names = find_and_register_source_region(
             morph,
             region_names,
             brain_regions,
@@ -184,7 +175,7 @@ def process_morphology(
         res_queue_morph.put(res_morph)
         return
 
-    axon = {"morph_path": morph_file, "source": source_region}
+    axon = {"morph_path": morph_file, "source": source_region_h}
 
     try:
         axon_neurites = get_axons(morph)
@@ -222,7 +213,7 @@ def process_morphology(
     # exclude the radius
     term_pts_list = terminal_points[:][:, 0:3].tolist()
 
-    # find their corres_morphponding brain regions
+    # find their corresponding brain regions
     terminals_regions = []
     # counter of number of out of bound terminal points found
     nb_oob_pts = 0
@@ -240,18 +231,22 @@ def process_morphology(
                 term_pt_asc, hierarchy_level, atlas_path + "/" + atlas_hierarchy
             )
             dict_acronyms_at_level[term_pt_asc[0]] = acronym_at_level
+            # add the hemisphere
+            acronym_at_level_h = (
+                acronym_at_level + "_" + get_hemisphere(term_pt, brain_regions.bbox)
+            )
             # and store it in the list of targeted regions of this morph
-            terminals_regions.append(acronym_at_level)
+            terminals_regions.append(acronym_at_level_h)
 
             # finally, store this terminal for the tufts clustering
             rows_all_terms.append(
                 {
                     "morph_path": morph_file,
                     "axon_id": axon_ids[terminal_id],
-                    "source": source_region,
+                    "source": source_region_h,
                     "brain_reg_voxels": brain_reg_voxels,
                     "source_id": region_map.get(brain_reg_voxels, "id", with_ascendants=False),
-                    "target": acronym_at_level,
+                    "target": acronym_at_level_h,
                     "terminal_id": terminal_id,
                     "section_id": sections_id[terminal_id],
                     "x": term_pt[0],
@@ -282,7 +277,7 @@ def process_morphology(
     morph_name_without_extension = os.path.splitext(base_filename)[0]
     res_queue_check.put(
         {
-            "source": source_region,
+            "source": source_region_h,
             "OOB": nb_oob_pts,
             "morph": morph_file,
             "name": morph_name_without_extension,
@@ -293,8 +288,8 @@ def process_morphology(
     lengths = compute_length_in_regions(
         morph, set(terminals_regions), brain_regions, region_map, dict_acronyms_at_level
     )
-    # and save it in rows_axon_lengths list
-    axon_lengths = {"morph_path": morph_file, "source": source_region}
+    # and save it in axon_lengths list
+    axon_lengths = {"morph_path": morph_file, "source": source_region_h}
     axon_lengths.update(lengths)
     res_queue_lengths.put(axon_lengths)
     res_queue_morph.put(res_morph)
@@ -428,7 +423,7 @@ def create_ap_table(
     for t, target in enumerate(term_df["target"].unique()):
         logging.debug("Progress: %s/%s", t + 1, len(term_df["target"].unique()))
         reg = term_df[term_df["target"] == target]["brain_reg_voxels"].iloc[0]
-        region_names[target] = [
+        region_names[without_hemisphere(target)] = [
             region_map.get(reg, "id", with_ascendants=False),
             region_map.get(reg, "acronym", with_ascendants=True)[-hierarchy_level - 1 :],
             region_map.get(reg, "name", with_ascendants=True)[-hierarchy_level - 1 :],

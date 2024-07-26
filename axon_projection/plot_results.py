@@ -22,6 +22,7 @@ from axon_projection.choose_hierarchy_level import build_parent_mapping
 from axon_projection.choose_hierarchy_level import find_acronym
 from axon_projection.choose_hierarchy_level import find_atlas_id
 from axon_projection.choose_hierarchy_level import find_parent_acronym
+from axon_projection.query_atlas import without_hemisphere
 
 # pylint: disable=too-many-lines
 
@@ -266,7 +267,7 @@ def sort_columns_by_region(df, region_names_df):
 
     def sort_hierarchy(col):
         # invert the hierarchy to go from coarse to fine
-        descending_hierarchy = eval(region_names_df.loc[col]["acronyms"])
+        descending_hierarchy = eval(region_names_df.loc[without_hemisphere(col)]["acronyms"])
         descending_hierarchy.reverse()
         return descending_hierarchy
 
@@ -397,6 +398,13 @@ def plot_clusters(config, verify=False):
             # plot only the color strips if target region is at current level
             # print(parent_region)
         regions_colors = pd.DataFrame(regions_color_dict)
+        # add '_L' to the index
+        regions_colors.index = regions_colors.index + "_L"
+        # # create a Right version, replacing the '_L' by '_R'
+        # regions_colors_R = regions_colors_L.rename(lambda x: x.replace("_L", "_R"), axis=0)
+        # print(regions_colors_R)
+        # regions_colors = pd.concat([regions_colors_L, regions_colors_R], axis=1)
+        # regions_colors.to_csv(config["output"]["path"] + "regions_colors.csv")
         # invert the order of the columns to have "root" on the top
         regions_colors = regions_colors[regions_colors.columns[::-1]]
         # regions_colors.to_csv(output_dir+"plots/"+source.replace("/", "-")+"_regions_colors.csv")
@@ -453,8 +461,8 @@ def compare_feat_in_regions(
     synth_feat_df = pd.read_csv(df_synth_path, index_col=0)
 
     # filter on just the source region of interest
-    bio_feat_df = bio_feat_df[bio_feat_df["source"] == source]
-    synth_feat_df = synth_feat_df[synth_feat_df["source"] == source]
+    bio_feat_df = bio_feat_df[bio_feat_df["source"].apply(without_hemisphere) == source]
+    synth_feat_df = synth_feat_df[synth_feat_df["source"].apply(without_hemisphere) == source]
 
     num_morphs_bio = len(bio_feat_df)
     num_morphs_synth = len(synth_feat_df)
@@ -485,10 +493,10 @@ def compare_feat_in_regions(
     # bio_feat_df = bio_feat_df.reset_index()
     # synth_feat_df = synth_feat_df.reset_index()
     bio_feat_df["parent_region"] = bio_feat_df["Region"].apply(
-        lambda x: find_parent_acronym(x, parent_mapping, regions_subset)
+        lambda x: find_parent_acronym(without_hemisphere(x), parent_mapping, regions_subset)
     )
     synth_feat_df["parent_region"] = synth_feat_df["Region"].apply(
-        lambda x: find_parent_acronym(x, parent_mapping, regions_subset)
+        lambda x: find_parent_acronym(without_hemisphere(x), parent_mapping, regions_subset)
     )
     # drop the regions which don't have a parent in the regions_subset
     bio_feat_df = bio_feat_df.dropna(subset=["parent_region"])
@@ -652,7 +660,7 @@ def compare_tuft_nb_in_regions(
     atlas_hierarchy="/gpfs/bbp.cscs.ch/project/proj148/scratch/"
     "circuits/20240531/.atlas/hierarchy.json",
 ):
-    """Compares the lengths in region between bio and synth axons."""
+    """Compares the tufts number in region between bio and synth axons."""
     os.makedirs(out_path, exist_ok=True)
     # Define RGBA color for 'tab:blue' with alpha = 0.5
     tab_blue_rgb = mcolors.to_rgb("tab:blue")
@@ -674,9 +682,9 @@ def compare_tuft_nb_in_regions(
     tuft_counts_bio_df = tuft_counts_bio_df[
         tuft_counts_bio_df["target_population_id"].str.startswith(str(source_brain_id) + "_")
     ]
-    # add the target_brain_id column, which is what is after the last '_'
+    # add the target_brain_id column
     tuft_counts_bio_df["target_brain_id"] = (
-        tuft_counts_bio_df["target_population_id"].str.split("_").str[-1].astype(int)
+        tuft_counts_bio_df["target_population_id"].str.split("_").str[-2].astype(int)
     )
     # and find the corresponding acronym
     tuft_counts_bio_df["target_acronym"] = tuft_counts_bio_df["target_brain_id"].apply(
@@ -694,7 +702,12 @@ def compare_tuft_nb_in_regions(
     nb_target_pts_synth_df = nb_target_pts_synth_df[
         nb_target_pts_synth_df["source_brain_region_id"] == source_brain_id
     ]
-    nb_tufts_synth = nb_target_pts_synth_df["num_tufts_to_grow"].sum()
+    # use this if the target_coords is before repeating the rows
+    # nb_tufts_synth = nb_target_pts_synth_df["num_tufts_to_grow"].sum()
+    # and also dict_synth_count should be the sum of num_tufts_to_grow
+    # otherwise, count the number of rows
+    nb_tufts_synth = len(nb_target_pts_synth_df)
+    print("nb_tufts_synth", nb_tufts_synth)
     nb_target_pts_synth_df["target_acronym"] = nb_target_pts_synth_df[
         "target_brain_region_id"
     ].apply(lambda x: find_acronym(hierarchy, x))
@@ -712,9 +725,12 @@ def compare_tuft_nb_in_regions(
             tuft_counts_bio_df["parent_region"] == region
         ]["number_of_tufts"].sum()
         dict_bio_tuft_props[region] = dict_bio_tuft_counts[region] / nb_tufts_bio
-        dict_synth_tuft_counts[region] = nb_target_pts_synth_df[
-            nb_target_pts_synth_df["parent_region"] == region
-        ]["num_tufts_to_grow"].sum()
+        # use len() here because each target point appears once
+        dict_synth_tuft_counts[region] = len(
+            nb_target_pts_synth_df[nb_target_pts_synth_df["parent_region"] == region][
+                "num_tufts_to_grow"
+            ]
+        )
         dict_synth_tuft_props[region] = dict_synth_tuft_counts[region] / nb_tufts_synth
 
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -805,12 +821,15 @@ def compare_tuft_nb_in_regions(
     synth_feat_df = pd.read_csv(
         os.path.split(df_synth_path)[0] + "/axon_lengths_8.csv", index_col=0
     )
-    synth_feat_df = synth_feat_df[synth_feat_df["source"] == source]
+    synth_feat_df = synth_feat_df[synth_feat_df["source"].apply(without_hemisphere) == source]
     for target_region in synth_feat_df.columns[2:]:
-        if find_parent_acronym(target_region, parent_mapping, regions_subset) is not None:
+        if (
+            find_parent_acronym(without_hemisphere(target_region), parent_mapping, regions_subset)
+            is not None
+        ):
             list_ROI.append(target_region)
             parent_dict[target_region] = find_parent_acronym(
-                target_region, parent_mapping, regions_subset
+                without_hemisphere(target_region), parent_mapping, regions_subset
             )
     synth_ROI = synth_feat_df[list_ROI]
     synth_ROI.to_csv(out_path + source + "_synth_ROI_all.csv")
@@ -819,7 +838,6 @@ def compare_tuft_nb_in_regions(
     synth_ROI.to_csv(out_path + source + "_synth_ROI.csv")
     for region in regions_subset:
         dict_synth_count[region] = len(synth_ROI[synth_ROI[region] > 0.0])
-    print(dict_synth_count)
 
     plot_pie(
         ax[1][0],
@@ -1099,6 +1117,161 @@ def compare_connectivity(
     fig.savefig(os.path.split(df_axons_path)[0] + "/connectivity_local_vs_long.pdf")
 
 
+def plot_hemispheres(
+    df_bio_path,
+    df_synth_path,
+    source="MOp5",
+    regions_subset=["MOp", "MOs", "SSp", "SSs", "CP", "PG", "SPVI"],
+    out_path="./",
+    atlas_hierarchy="/gpfs/bbp.cscs.ch/project/proj148/scratch/"
+    "circuits/20240531/.atlas/hierarchy.json",
+):
+    """Plot hemispheres targeting."""
+    os.makedirs(out_path, exist_ok=True)
+    # build the parent mapping
+    with open(atlas_hierarchy, encoding="utf-8") as f:
+        hierarchy_data = json.load(f)
+    hierarchy = hierarchy_data["msg"][0]
+    parent_mapping = build_parent_mapping(
+        hierarchy, with_hemisphere=False
+    )  # find in the hierarchy file the node with acronym == source, and get its atlas_id
+    source_brain_id = find_atlas_id(hierarchy, source)
+
+    # load the bio df
+    with pathlib.Path(df_bio_path).open(mode="r", encoding="utf-8") as f:
+        tuft_counts_bio_df = pd.DataFrame(json.load(f))
+    # keep only the rows where target_pop_id starts with source_brain_id
+    tuft_counts_bio_df = tuft_counts_bio_df[
+        tuft_counts_bio_df["target_population_id"].str.startswith(str(source_brain_id) + "_")
+    ]
+    # add the target_brain_id column, which is what is after the second before last '_'
+    tuft_counts_bio_df["target_brain_id"] = (
+        tuft_counts_bio_df["target_population_id"].str.split("_").str[-2].astype(int)
+    )
+    # and the source_hemisphere
+    tuft_counts_bio_df["source_hemisphere"] = (
+        tuft_counts_bio_df["target_population_id"].str.split("_").str[1]
+    )
+    # and the target_hemisphere
+    tuft_counts_bio_df["target_hemisphere"] = (
+        tuft_counts_bio_df["target_population_id"].str.split("_").str[-1]
+    )
+    # and find the corresponding acronym
+    tuft_counts_bio_df["target_acronym"] = tuft_counts_bio_df["target_brain_id"].apply(
+        lambda x: find_acronym(hierarchy, x)
+    )
+    # find the parent_region within the region subset for these acronyms
+    tuft_counts_bio_df["parent_region"] = tuft_counts_bio_df["target_acronym"].apply(
+        lambda x: find_parent_acronym(x, parent_mapping, regions_subset)
+    )
+    # count the number of rows without a parent_region per hemisphere
+    print(tuft_counts_bio_df[tuft_counts_bio_df["parent_region"].isna()])
+    tuft_counts_bio_df.loc[tuft_counts_bio_df["parent_region"].isna(), "parent_region"] = "Other"
+    # drop the rows if their parent_region is na
+    # tuft_counts_bio_df = tuft_counts_bio_df.dropna(subset=["parent_region"])
+
+    # load the synth_df
+    nb_target_pts_synth_df = pd.read_csv(df_synth_path, index_col=0)
+    nb_target_pts_synth_df = nb_target_pts_synth_df[
+        nb_target_pts_synth_df["source_brain_region_id"] == source_brain_id
+    ]
+    nb_target_pts_synth_df["target_acronym"] = nb_target_pts_synth_df[
+        "target_brain_region_id"
+    ].apply(lambda x: find_acronym(hierarchy, x))
+    nb_target_pts_synth_df["parent_region"] = nb_target_pts_synth_df["target_acronym"].apply(
+        lambda x: find_parent_acronym(x, parent_mapping, regions_subset)
+    )
+    print(nb_target_pts_synth_df[nb_target_pts_synth_df["parent_region"].isna()])
+    nb_target_pts_synth_df.loc[
+        nb_target_pts_synth_df["parent_region"].isna(), "parent_region"
+    ] = "Other"
+    # nb_target_pts_synth_df = nb_target_pts_synth_df.dropna(subset=["parent_region"])
+    nb_target_pts_synth_df["source_hemisphere"] = (
+        nb_target_pts_synth_df["target_population_id"].str.split("_").str[1]
+    )
+
+    # Define colors for each parent_region
+    colors = plt.cm.tab20.colors
+    color_dict = {
+        region: color for region, color in zip(tuft_counts_bio_df["parent_region"].unique(), colors)
+    }
+    source_hemispheres = tuft_counts_bio_df["source_hemisphere"].unique()
+    fig, ax = plt.subplots(2, 2, figsize=(10, 10))
+
+    for t, typ in enumerate(["bio", "synth"]):
+        # Create pie charts
+        if typ == "bio":
+            df = tuft_counts_bio_df
+            grouped = (
+                tuft_counts_bio_df.groupby(
+                    ["source_hemisphere", "target_hemisphere", "parent_region"]
+                )["number_of_tufts"]
+                .sum()
+                .reset_index()
+            )
+            val_col = "number_of_tufts"
+            morph_col = "morph_file"
+        else:
+            df = nb_target_pts_synth_df
+            # we don't use num_tufts_to_grow here because the data has
+            # num_tufts_to_grow nb of rows per target (axon-synthesis' algorithm)
+            grouped = (
+                nb_target_pts_synth_df.groupby(
+                    ["source_hemisphere", "target_hemisphere", "parent_region"]
+                )
+                .size()
+                .reset_index(name="count")
+            )
+            val_col = "count"
+            morph_col = "morphology"
+        print(grouped)
+        print(grouped[grouped["parent_region"] == "Other"])
+        for s, source_hemisphere in enumerate(source_hemispheres):
+            subset = grouped[grouped["source_hemisphere"] == source_hemisphere]
+            explode = [
+                0.2
+                if (target == "L" and source_hemisphere == "R")
+                or (target == "R" and source_hemisphere == "L")
+                else 0.0
+                for target in subset["target_hemisphere"]
+            ]
+
+            wedges, texts, autotexts = ax[t, s].pie(
+                subset[val_col],
+                labels=None,  # [f"{parent_region} ({target_hemisphere})" for parent_region,
+                # target_hemisphere in zip(subset['parent_region'], subset['target_hemisphere'])],
+                colors=[color_dict[parent_region] for parent_region in subset["parent_region"]],
+                autopct="%1.1f%%",
+                startangle=90,
+                pctdistance=1.15,
+                explode=explode,
+            )
+            # Customize the autopct text to be outside the slices and colored
+            for text, autotext, wedge in zip(texts, autotexts, wedges):
+                autotext.set_color(wedge.get_facecolor())
+                autotext.set_fontsize(10)
+                autotext.set_weight("bold")
+                text.set_fontsize(10)
+                text.set_weight("bold")
+                text.set_color(wedge.get_facecolor())
+
+            # Equal aspect ratio ensures that pie is drawn as a circle.
+            ax[t, s].axis("equal")
+            n_axons = df[df["source_hemisphere"] == source_hemisphere][morph_col].nunique()
+            ax[t, s].set_title(
+                f"Source hemisphere: {source_hemisphere} ({typ}, n_axons = {n_axons})"
+            )
+    ax[1, 1].legend(
+        wedges,
+        [f"{parent_region}" for parent_region in subset["parent_region"]],
+        title="Regions",
+        loc="center right",
+        bbox_to_anchor=(1, 0.5),
+    )
+    plt.suptitle(f"Tuft counts from {source}", fontsize=16)
+    plt.savefig(out_path + "tuft_count_hemispheres.pdf")
+
+
 def plot_results(config, verify=False):
     """Plots all the results."""
     makedirs(config["output"]["path"] + "plots/", exist_ok=True)
@@ -1106,46 +1279,6 @@ def plot_results(config, verify=False):
     if not verify:
         compare_feature_vectors(config)
         compare_feature_vectors_by_source(config)
-        lengths_bio_path = (
-            config["output"]["path"]
-            + "axon_lengths_"
-            + str(config["morphologies"]["hierarchy_level"])
-            + ".csv"
-        )
-        terms_bio_path = (
-            config["output"]["path"]
-            + "axon_terminals_"
-            + str(config["morphologies"]["hierarchy_level"])
-            + ".csv"
-        )
-        try:
-            lengths_synth_path = (
-                config["validation"]["synth_axons_path"]
-                + "/axon_lenghts_"
-                + str(config["morphologies"]["hierarchy_level"])
-                + ".csv"
-            )
-            terms_synth_path = (
-                config["validation"]["synth_axons_path"]
-                + "/axon_terminals_"
-                + str(config["morphologies"]["hierarchy_level"])
-                + ".csv"
-            )
-        except FileNotFoundError:
-            logging.warning("Synth axons path not found, skipping comparison.")
-            sys.exit(1)
-        compare_feat_in_regions(
-            lengths_bio_path,
-            lengths_synth_path,
-            "lengths",
-            out_path=config["output"]["path"] + "plots/",
-        )
-        compare_feat_in_regions(
-            terms_bio_path,
-            terms_synth_path,
-            "terminals",
-            out_path=config["output"]["path"] + "plots/",
-        )
 
 
 if __name__ == "__main__":

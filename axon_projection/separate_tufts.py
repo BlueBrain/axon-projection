@@ -25,6 +25,7 @@ from axon_projection.compute_morphometrics import compute_stats_cv
 from axon_projection.compute_morphometrics import get_axons
 from axon_projection.plot_utils import plot_trunk
 from axon_projection.plot_utils import plot_tuft
+from axon_projection.query_atlas import get_hemisphere
 from axon_projection.query_atlas import load_atlas
 
 
@@ -753,7 +754,7 @@ def compute_clustered_tufts_scores(config):
     tufts_df["population_id"] = tufts_df["morph_file"].map(
         posteriors_df.set_index("morph_path")["population_id"]
     )
-    # TODO compute tufts target_population_id by taking the region of the tuft ancestor
+    # compute tufts target_population_id by taking the region of the tuft ancestor
     atlas_path = config["atlas"]["path"]
     atlas_regions = config["atlas"]["regions"]
     atlas_hierarchy = config["atlas"]["hierarchy"]
@@ -766,8 +767,15 @@ def compute_clustered_tufts_scores(config):
     tufts_df["target_region_id"] = brain_regions.lookup(
         tufts_df["ancestor_coords"].tolist(), outer_value=-1
     )
+    tufts_df["hemisphere"] = tufts_df.apply(
+        lambda row: get_hemisphere(row["ancestor_coords"], brain_regions.bbox), axis=1
+    )
     tufts_df["target_population_id"] = (
-        tufts_df["population_id"].astype(str) + "_" + tufts_df["target_region_id"].astype(str)
+        tufts_df["population_id"].astype(str)
+        + "_"
+        + tufts_df["target_region_id"].astype(str)
+        + "_"
+        + tufts_df["hemisphere"]
     )
     # finally replace pop_id with target_pop_id
     tufts_df["population_id"] = tufts_df["target_population_id"].astype(str)
@@ -793,5 +801,8 @@ if __name__ == "__main__":
 
     config_ = configparser.ConfigParser()
     config_.read(sys.argv[1])
-
-    compute_morph_properties(config_)
+    tufts_by_region = config_["separate_tufts"]["clustering_method"] == "region"
+    if tufts_by_region:
+        compute_morph_properties(config_)
+    else:
+        compute_clustered_tufts_scores(config_)

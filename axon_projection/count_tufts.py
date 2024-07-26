@@ -68,7 +68,7 @@ def compute_tufts_numbers_distribution(config):
 
     # count the number of entries per morphology with the same source_population_id
     tufts_counts_df["source_population_id"] = (
-        tufts_counts_df["target_population_id"].str.split("_").str[:-1].str.join("_")
+        tufts_counts_df["target_population_id"].str.split("_").str[0:3].str.join("_")
     )
     nb_targets_per_morph_df = tufts_counts_df.groupby(
         by=["morph_file", "source_population_id"]

@@ -57,7 +57,7 @@ def full_workflow(config):
             config.has_option("separate_tufts", "cluster_tufts")
             and config["separate_tufts"]["cluster_tufts"] == "True"
         ):
-            # debug = true is necessary to create the tufts file
+            # debug = True is necessary to create the tufts file
             create_inputs(
                 config["morphologies"]["path"],
                 config["output"]["path"],

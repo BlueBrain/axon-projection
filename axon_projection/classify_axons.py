@@ -10,6 +10,9 @@ import pandas as pd
 from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import GridSearchCV
 
+from axon_projection.query_atlas import region_hemisphere
+from axon_projection.query_atlas import without_hemisphere
+
 
 def gmm_bic_score(estimator, data):
     """Callable to pass to GridSearchCV that will use the BIC score."""
@@ -99,7 +102,10 @@ def compute_posteriors(morphs_df, source, gmm, source_region_id):
     probas = gmm.predict_proba(feature_vectors)
     log_likelihood = gmm.score_samples(feature_vectors)
     # build the list of population ids, one per morph
-    pop_ids_list = [str(source_region_id) + "_" + str(x) for x in class_assignment]
+    pop_ids_list = [
+        str(source_region_id) + "_" + region_hemisphere(source) + "_" + str(x)
+        for x in class_assignment
+    ]
 
     # create DataFrame for morphologies, probabilities, and source region
     df_post = pd.DataFrame(
@@ -246,13 +252,16 @@ def run_classification(config, verify=False):
         ).fit(data)
 
         logging.info("GMM params: %s", gmm.get_params())
+        source_brain_reg_id = region_names_df.at[without_hemisphere(s_a), "id"]
         for c in range(n_components):
+            source_pop_id = str(source_brain_reg_id) + "_" + region_hemisphere(s_a) + "_" + str(c)
             clustering_output.append(
                 [
                     s_a,
-                    region_names_df.at[s_a, "id"],
+                    source_brain_reg_id,
+                    region_hemisphere(s_a),
                     c,
-                    str(region_names_df.at[s_a, "id"]) + "_" + str(c),
+                    source_pop_id,
                     int(round(n_rows * gmm.weights_[c])),
                     gmm.weights_[c],
                     gmm.means_[c].tolist(),
@@ -264,32 +273,39 @@ def run_classification(config, verify=False):
                 # don't show probability if it's 0
                 if gmm.means_[c][t] < 1e-16:
                     continue
-                source_pop_id = str(region_names_df.at[s_a, "id"]) + "_" + str(c)
-                target_region_id = region_names_df.at[target_region_acronyms[t], "id"]
+
+                target_region_id = region_names_df.at[
+                    without_hemisphere(target_region_acronyms[t]), "id"
+                ]
                 connexion_prob.append(
                     [
                         s_a,
-                        region_names_df.at[s_a, "id"],
+                        source_brain_reg_id,
+                        region_hemisphere(s_a),
                         c,
                         source_pop_id,
                         target_region_acronyms[t],
                         target_region_id,
-                        source_pop_id + "_" + str(target_region_id),
+                        source_pop_id
+                        + "_"
+                        + str(target_region_id)
+                        + "_"
+                        + region_hemisphere(target_region_acronyms[t]),
+                        region_hemisphere(target_region_acronyms[t]),
                         gmm.means_[c][t] / np.sum(gmm.means_[c]),
                         gmm.means_[c][t],
                     ]
                 )
 
         # compute the probability to belong to each class for each morph
-        df_post = pd.concat(
-            [df_post, compute_posteriors(f_as, s_a, gmm, region_names_df.at[s_a, "id"])]
-        )
+        df_post = pd.concat([df_post, compute_posteriors(f_as, s_a, gmm, source_brain_reg_id)])
 
     df_out = pd.DataFrame(
         clustering_output,
         columns=[
             "source",
             "brain_region_id",
+            "hemisphere",
             "class_id",
             "population_id",
             "num_data_points",
@@ -305,11 +321,13 @@ def run_classification(config, verify=False):
         columns=[
             "source",
             "source_brain_region_id",
+            "source_hemisphere",
             "class_id",
             "source_population_id",
             "target_region",
             "target_brain_region_id",
             "target_population_id",
+            "target_hemisphere",
             "probability",
             "feature_means",
         ],
