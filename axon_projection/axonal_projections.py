@@ -263,7 +263,7 @@ def process_morphology(
     if len(rows_all_terms) > 0:
         res_queue_all_terms.put(rows_all_terms)
     else:
-        logging.warning(f"No terminal points found for morph {morph_file} !")
+        logging.warning("No terminal points found for morph %s !", morph_file)
         res_queue_all_terms.put(rows_all_terms)
     # count the number of terminals for each region
     n_terms_per_regions = Counter(terminals_regions)
