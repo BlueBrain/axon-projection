@@ -28,6 +28,7 @@ reqs = [
     "axon-synthesis>=0.1.0.dev0",
     "synthesis_workflow>=1.0.2",
     "tabulate",
+    "pycirclize",
 ]
 
 doc_reqs = [
