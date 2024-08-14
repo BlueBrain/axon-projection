@@ -22,7 +22,7 @@ def gmm_bic_score(estimator, data):
 
 # Need to disable "unsubpscriptable object" error with pylint, this is a bug from their side
 # pylint: disable=unsubscriptable-object,unsupported-assignment-operation
-def find_good_gmm(data, n_components_max, seed=None, best=False, n_jobs=12):
+def find_good_gmm(data, n_components_range, seed=None, best=False, n_jobs=12):
     """Finds a good number of components and variance type for a GMM on the given data.
 
     Takes in input the data on which we want to build a Gaussian Mixture Model (GMM),
@@ -32,7 +32,8 @@ def find_good_gmm(data, n_components_max, seed=None, best=False, n_jobs=12):
     Args:
         data (list numpy array): the feature vectors on which to base the GMM.
         In this case, we are using number of terminal points for each target region.
-        n_components_max (int) : maximum number of mixtures to use (i.e. number of Gaussians).
+        n_components_range (list int) : mininmum, maximum number of mixtures to use
+        (i.e. number of Gaussians).
         The algorithm will use at most n_components_max classes for the clustering.
         seed (int) : random seed, for reproducibility. Seed is used for the random initialization
             of the GMMs (as is done in K-means algorithm)
@@ -46,8 +47,9 @@ def find_good_gmm(data, n_components_max, seed=None, best=False, n_jobs=12):
     """
     # give the range of number of classes to try, and allowed variances types
     param_grid = {
-        "n_components": range(1, n_components_max + 1),
-        "covariance_type": ["spherical", "tied", "diag", "full"],
+        "n_components": range(n_components_range[0], n_components_range[1]),
+        # "covariance_type": ["spherical", "tied", "diag", "full"],
+        "covariance_type": ["spherical"],
     }
     # initialize the search parameters
     grid_search = GridSearchCV(
@@ -206,7 +208,9 @@ def run_classification(config, verify=False):
                             "probabilities": [1] * n_rows,  # convert probabilities to list
                             "class_assignment": [0]
                             * n_rows,  # the class ID assigned a posteriori to this morpho
-                            "population_id": [str(region_names_df.at[s_a, "id"]) + "_0"]
+                            "population_id": [
+                                str(region_names_df.at[without_hemisphere(s_a), "id"]) + "_0"
+                            ]
                             * n_rows,  # the population_id of the morpho
                             "log_likelihood": [0]
                             * n_rows,  # the prob to observe each point knowing the gmm
@@ -222,16 +226,15 @@ def run_classification(config, verify=False):
         if imposed_n_components.get(s_a) is not None:  # and not verify:
             logging.info("Imposed number of components for %s : %s", s_a, imposed_n_components[s_a])
             n_components = imposed_n_components[s_a]
-            cov_type = "spherical"
+            cov_type = "full"
         # else, perform search for a good number of components
         else:
-            # we allow at most to have n_max_components classes
-            # set an arbitrary limit to 20 classes in any case
-            n_max_components = min(int(n_rows / 2.0), 20)
+            n_min_components = int(n_rows / 2.0)
+            n_max_components = int(n_rows * 4.0 / 5.0)  # 1/5 for cross-validation
             # search for parameters combinations that give a good BIC score
             good_params, grid_search_res = find_good_gmm(
                 data,
-                n_max_components,
+                [n_min_components, n_max_components],
                 best=(config["classify"]["best_BIC"] == "True"),
                 seed=seed,
                 n_jobs=n_jobs,
@@ -316,6 +319,12 @@ def run_classification(config, verify=False):
         ],
     )
     df_out.to_csv(out_path + "clustering_output.csv")
+    # save a lite version for axon synthesis
+    df_out_lite = df_out[
+        ["source", "brain_region_id", "hemisphere", "population_id", "probability"]
+    ]
+    df_out_lite.to_csv(out_path + "clustering_output_AS.csv")
+
     df_conn = pd.DataFrame(
         connexion_prob,
         columns=[

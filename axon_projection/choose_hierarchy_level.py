@@ -129,3 +129,21 @@ def find_parent_acronym(acronym, parent_mapping, target_regions):
             return parent
         parent = parent_mapping.get(parent)
     return None
+
+
+def filter_regions_with_parents(regions_list, target_parents, hierarchy_file):
+    """Filter and return regions with parents in target_parents, return also which parents."""
+    with open(hierarchy_file, encoding="utf-8") as f:
+        hierarchy_data = json.load(f)
+    hierarchy = hierarchy_data["msg"][0]
+    parent_mapping = build_parent_mapping(hierarchy)
+
+    filtered_regions = []
+    filtered_parents = []
+    for region in regions_list:
+        if find_parent_acronym(region, parent_mapping, target_parents) is not None:
+            filtered_regions.append(region)
+            filtered_parents.append(find_parent_acronym(region, parent_mapping, target_parents))
+    filtered_regions = list(set(filtered_regions))
+    filtered_parents = list(set(filtered_parents))
+    return filtered_regions, filtered_parents

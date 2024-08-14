@@ -8,12 +8,15 @@ import pathlib
 import sys
 from os import makedirs
 
+import matplotlib as mpl
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib.colors import LogNorm
+from pycirclize import Circos
+from pycirclize.parser import Matrix
 from scipy.stats import linregress
 from sklearn.metrics import r2_score
 from synthesis_workflow.validation import mvs_score
@@ -452,14 +455,16 @@ def compare_feat_in_regions(
     source="MOp5",
     regions_subset=["MOp", "MOs", "SSp", "SSs", "CP", "PG", "SPVI"],
     out_path="./",
-    atlas_hierarchy="/gpfs/bbp.cscs.ch/project/proj148/scratch/"
-    "circuits/20240531/.atlas/hierarchy.json",
+    atlas_hierarchy="/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/"
+    "atlas_aleksandra/atlas-release-mouse-barrels-density-mod/hierarchy.json",
 ):
     """Compares the lengths in region between bio and synth axons."""
     os.makedirs(out_path, exist_ok=True)
     bio_feat_df = pd.read_csv(df_bio_path, index_col=0)
     synth_feat_df = pd.read_csv(df_synth_path, index_col=0)
 
+    sns.set()
+    mpl.rcdefaults()  # Reset to defaults
     # filter on just the source region of interest
     bio_feat_df = bio_feat_df[bio_feat_df["source"].apply(without_hemisphere) == source]
     synth_feat_df = synth_feat_df[synth_feat_df["source"].apply(without_hemisphere) == source]
@@ -475,9 +480,54 @@ def compare_feat_in_regions(
 
     dict_bio_count = {}
     dict_synth_count = {}
-    dict_bio_count_per_axon = {}
-    dict_synth_count_per_axon = {}
-
+    dict_bio_count_norm = {}
+    dict_synth_count_norm = {}
+    dict_tot_bio = {}
+    dict_tot_synth = {}
+    ####
+    # first count the number of morphs terminating in each region
+    total_rows_bio = len(bio_feat_df)
+    total_rows_synth = len(synth_feat_df)
+    list_ROI_bio = []
+    list_ROI_synth = []
+    parent_dict_bio = {}
+    parent_dict_synth = {}
+    for target_region in bio_feat_df.columns[2:]:
+        if (
+            find_parent_acronym(without_hemisphere(target_region), parent_mapping, regions_subset)
+            is not None
+        ):
+            list_ROI_bio.append(target_region)
+            parent_dict_bio[target_region] = find_parent_acronym(
+                without_hemisphere(target_region), parent_mapping, regions_subset
+            )
+    for target_region in synth_feat_df.columns[2:]:
+        if (
+            find_parent_acronym(without_hemisphere(target_region), parent_mapping, regions_subset)
+            is not None
+        ):
+            list_ROI_synth.append(target_region)
+            parent_dict_synth[target_region] = find_parent_acronym(
+                without_hemisphere(target_region), parent_mapping, regions_subset
+            )
+    bio_ROI = bio_feat_df[list_ROI_bio]
+    bio_ROI.to_csv(out_path + source + "_bio_ROI_all.csv")
+    synth_ROI = synth_feat_df[list_ROI_synth]
+    # sum columns that have same parent, and rename the columns to the parent's name
+    bio_ROI = bio_ROI.groupby(parent_dict_bio, axis=1).sum()
+    synth_ROI = synth_ROI.groupby(parent_dict_synth, axis=1).sum()
+    bio_ROI.to_csv(out_path + source + "_bio_ROI.csv")
+    synth_ROI.to_csv(out_path + source + "_synth_ROI.csv")
+    for region in regions_subset:
+        dict_bio_count[region] = len(bio_ROI[bio_ROI[region] > 0.0])
+        dict_synth_count[region] = len(synth_ROI[synth_ROI[region] > 0.0])
+        dict_bio_count_norm[region] = dict_bio_count[region] / total_rows_bio
+        dict_synth_count_norm[region] = dict_synth_count[region] / total_rows_synth
+        dict_tot_bio[region] = bio_ROI[region].sum() / total_rows_bio
+        dict_tot_synth[region] = synth_ROI[region].sum() / total_rows_synth
+    print(dict_bio_count_norm)
+    print(dict_synth_count_norm)
+    ####
     # drop the morph_path and source columns
     bio_feat_df = bio_feat_df.drop(["morph_path", "source"], axis=1)
     synth_feat_df = synth_feat_df.drop(["morph_path", "source"], axis=1)
@@ -507,6 +557,7 @@ def compare_feat_in_regions(
     synth_feat_df["Type"] = "Synth"
 
     bio_feat_df.to_csv(out_path + "bio_feat_melted_" + feature_vec + ".csv")
+    synth_feat_df.to_csv(out_path + "synth_feat_melted_" + feature_vec + ".csv")
 
     # Define RGBA color for 'tab:blue' with alpha = 0.5
     tab_blue_rgb = mcolors.to_rgb("tab:blue")
@@ -523,7 +574,8 @@ def compare_feat_in_regions(
     # ax2_twin = ax2.twinx()
     barwidth = 0.4
     # for the boxplot or violinplot
-    ax = plt.subplot(3, 1, (2, 3), sharex=ax2)
+    ax = plt.subplot(3, 1, 2, sharex=ax2)
+    axTot = plt.subplot(3, 1, 3, sharex=ax2)
     # hide the top and right spines
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -531,6 +583,8 @@ def compare_feat_in_regions(
     ax2.spines["top"].set_visible(False)
     ax2.spines["right"].set_visible(False)
     ax2.spines["bottom"].set_visible(False)
+    axTot.spines["top"].set_visible(False)
+    axTot.spines["right"].set_visible(False)
     combined_df = combined_df[combined_df[feature_vec] > 0.0]
     sns.violinplot(
         x="parent_region",
@@ -540,6 +594,7 @@ def compare_feat_in_regions(
         split=True,
         palette=palette,
         log_scale=True,
+        ax=ax,
     )
     # Add number of observations on top of each boxplot
     print("total_rows_bio ", total_rows_bio)
@@ -550,14 +605,14 @@ def compare_feat_in_regions(
         # Calculate number of observations
         bio_data = combined_df[
             (combined_df["parent_region"] == region) & (combined_df["Type"] == "Bio")
-        ][feature_vec]
+        ][["Region", feature_vec]]
         synth_data = combined_df[
             (combined_df["parent_region"] == region) & (combined_df["Type"] == "Synth")
-        ][feature_vec]
+        ][["Region", feature_vec]]
 
         # Perform statistical test (mvs)
         try:
-            mvs = mvs_score(bio_data, synth_data)
+            mvs = mvs_score(bio_data[feature_vec], synth_data[feature_vec])
         except Exception as e:  # pylint: disable=broad-except
             logging.warning("mvs failed for %s, [Error: %s]", region, repr(e))
             mvs = 1
@@ -574,7 +629,7 @@ def compare_feat_in_regions(
             significance = ""
 
         # Annotate significance above the plot
-        plt.text(
+        ax.text(
             i,
             combined_df[feature_vec].max() + 0.1,
             significance,
@@ -584,25 +639,31 @@ def compare_feat_in_regions(
             fontsize=16,
         )
 
-        bio_count = len(bio_data)
-        dict_bio_count[region] = bio_count
-        dict_bio_count_per_axon[region] = bio_count / num_morphs_bio
-        synth_count = len(synth_data)
-        dict_synth_count[region] = synth_count
-        dict_synth_count_per_axon[region] = synth_count / num_morphs_synth
+        print(synth_data["Region"].unique())
+        print(
+            f"region {region} has {len(bio_data['Region'].unique())} bio "
+            "and {len(synth_data['Region'].unique())} synth"
+        )
+
+        # bio_count = len(bio_data)
+        # dict_bio_count[region] = bio_count
+        # dict_bio_count_norm[region] = bio_count / num_morphs_bio
+        # synth_count = len(synth_data)
+        # dict_synth_count[region] = synth_count
+        # dict_synth_count_norm[region] = synth_count / num_morphs_synth
         # Display number of observations on plot
         ax2.text(
             i - barwidth / 2.0,
-            dict_bio_count_per_axon[region],
-            f"{dict_bio_count_per_axon[region]:.2f} (n={dict_bio_count[region]})",
+            dict_bio_count_norm[region],
+            f"{dict_bio_count_norm[region]:.2f} (n={dict_bio_count[region]})",
             color=palette["Bio"],
             fontsize=10,
             rotation=90,
         )  # combined_df['Length'].max()
         ax2.text(
             i + barwidth / 2.0,
-            dict_synth_count_per_axon[region],
-            f"{dict_synth_count_per_axon[region]:.2f} (n={dict_synth_count[region]})",
+            dict_synth_count_norm[region],
+            f"{dict_synth_count_norm[region]:.2f} (n={dict_synth_count[region]})",
             color=palette["Synth"],
             fontsize=10,
             rotation=90,
@@ -612,27 +673,45 @@ def compare_feat_in_regions(
     # dict_bio_count_normalized = {k: v / total_rows_bio for k, v in dict_bio_count.items()}
     # print("dict_bio_count_norm_values ", dict_bio_count_normalized.values())
     ax2.bar(
-        dict_bio_count_per_axon.keys(),
-        dict_bio_count_per_axon.values(),
+        dict_bio_count_norm.keys(),
+        dict_bio_count_norm.values(),
         width=-barwidth,
         align="edge",
         color=palette["Bio"],
         label="Reconstructed",
     )
-    ax2.set_ylabel("Number of observations per axon")  # , color=palette["Bio"])
+    ax2.set_ylabel("Mean observations")  # , color=palette["Bio"])
     ax2.bar(
-        dict_synth_count_per_axon.keys(),
-        dict_synth_count_per_axon.values(),
+        dict_synth_count_norm.keys(),
+        dict_synth_count_norm.values(),
         width=barwidth,
         align="edge",
         color=palette["Synth"],
         label="Synthesized",
     )
     # set the y limit as the max value of the two dicts
-    ax2.set_ylim(0, max(*dict_bio_count_per_axon.values(), *dict_synth_count_per_axon.values()))
+    ax2.set_ylim(0, max(*dict_bio_count_norm.values(), *dict_synth_count_norm.values()))
     # ax2_twin.set_ylabel("Number of observations", color=palette["Synth"])
+    axTot.bar(
+        dict_tot_bio.keys(),
+        dict_tot_bio.values(),
+        width=-barwidth,
+        align="edge",
+        color=palette["Bio"],
+        label="Reconstructed",
+    )
+    axTot.bar(
+        dict_tot_synth.keys(),
+        dict_tot_synth.values(),
+        width=barwidth,
+        align="edge",
+        color=palette["Synth"],
+        label="Synthesized",
+    )
+    axTot.set_ylabel("Total length per axon [μm]")
+    axTot.set_ylim(0, max(*dict_tot_bio.values(), *dict_tot_synth.values()))
 
-    ax.set_xlabel("Brain region")
+    axTot.set_xlabel("Brain region")
     if feature_vec == "lengths":
         # Add title and labels
         plt.suptitle("Axon lengths distribution")
@@ -657,8 +736,8 @@ def compare_tuft_nb_in_regions(
     source="MOp5",
     regions_subset=["MOp", "MOs", "SSp", "SSs", "CP", "PG", "SPVI"],
     out_path="./",
-    atlas_hierarchy="/gpfs/bbp.cscs.ch/project/proj148/scratch/"
-    "circuits/20240531/.atlas/hierarchy.json",
+    atlas_hierarchy="/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/"
+    "atlas_aleksandra/atlas-release-mouse-barrels-density-mod/hierarchy.json",
 ):
     """Compares the tufts number in region between bio and synth axons."""
     os.makedirs(out_path, exist_ok=True)
@@ -800,6 +879,11 @@ def compare_tuft_nb_in_regions(
         "PG": 0.097,
         "MY": 0.121,
     }
+    dict_bio_tuft_props = {key: dict_bio_tuft_props[key] for key in sorted(dict_bio_tuft_props)}
+    dict_synth_tuft_props = {
+        key: dict_synth_tuft_props[key] for key in sorted(dict_synth_tuft_props)
+    }
+    dict_jiang_props = {key: dict_jiang_props[key] for key in sorted(dict_jiang_props)}
     plot_pie(
         ax[0][0],
         dict_bio_tuft_props.keys(),
@@ -819,7 +903,7 @@ def compare_tuft_nb_in_regions(
     parent_dict = {}
     dict_synth_count = {}
     synth_feat_df = pd.read_csv(
-        os.path.split(df_synth_path)[0] + "/axon_lengths_8.csv", index_col=0
+        os.path.split(df_synth_path)[0] + "/axon_lengths_12.csv", index_col=0
     )
     synth_feat_df = synth_feat_df[synth_feat_df["source"].apply(without_hemisphere) == source]
     for target_region in synth_feat_df.columns[2:]:
@@ -839,6 +923,7 @@ def compare_tuft_nb_in_regions(
     for region in regions_subset:
         dict_synth_count[region] = len(synth_ROI[synth_ROI[region] > 0.0])
 
+    dict_synth_count = {key: dict_synth_count[key] for key in sorted(dict_synth_count)}
     plot_pie(
         ax[1][0],
         dict_synth_count.keys(),
@@ -883,8 +968,8 @@ def compare_lengths_vs_connectivity(
     df_synth_path,
     source="MOp5",
     target_regions=["MOp", "MOs", "SSp", "SSs", "CP", "PG", "VISp"],
-    atlas_hierarchy="/gpfs/bbp.cscs.ch/project/proj148/scratch/"
-    "circuits/20240531/.atlas/hierarchy.json",
+    atlas_hierarchy="/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/"
+    "atlas_aleksandra/atlas-release-mouse-barrels-density-mod/hierarchy.json",
 ):
     """Compare and plot bio lengths vs synth connectivity."""
     df_bio = pd.read_csv(df_bio_path, index_col=0)
@@ -1041,10 +1126,10 @@ def compare_connectivity(
     df_axons_path,
     source="MOp5",
     target_regions=["MOp", "MOs", "SSp", "SSs", "CP", "PG", "VISp"],
-    atlas_hierarchy="/gpfs/bbp.cscs.ch/project/proj148/scratch/"
-    "circuits/20240531/.atlas/hierarchy.json",
+    atlas_hierarchy="/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/"
+    "atlas_aleksandra/atlas-release-mouse-barrels-density-mod/hierarchy.json",
 ):
-    """Compare and plot bio lengths vs synth connectivity."""
+    """Compare and plot connectivity with and without long-range axons."""
     df_no_axons = pd.read_csv(df_no_axons_path)
     df_axons = pd.read_csv(df_axons_path)
 
@@ -1117,14 +1202,124 @@ def compare_connectivity(
     fig.savefig(os.path.split(df_axons_path)[0] + "/connectivity_local_vs_long.pdf")
 
 
+def plot_chord_diagram(
+    df_no_axons_path,
+    df_axons_path,
+    target_regions=["MOp", "MOs", "SSp", "SSs"],
+    atlas_hierarchy="/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/"
+    "atlas_aleksandra/atlas-release-mouse-barrels-density-mod/hierarchy.json",
+):
+    """Compare and plot connectivity of multiple regions with and without axons."""
+    # set fontsize to 16
+    plt.rcParams.update({"font.size": 16})
+    df_no_axons = pd.read_csv(df_no_axons_path)
+    df_axons = pd.read_csv(df_axons_path)
+
+    with open(atlas_hierarchy, encoding="utf-8") as f:
+        hierarchy_data = json.load(f)
+    hierarchy = hierarchy_data["msg"][0]
+    parent_mapping = build_parent_mapping(hierarchy)
+
+    df_no_axons["parent_region_pre"] = df_no_axons["idx-region_pre"].apply(
+        lambda x: find_parent_acronym(x, parent_mapping, target_regions)
+    )
+    df_no_axons["parent_region_post"] = df_no_axons["idx-region_post"].apply(
+        lambda x: find_parent_acronym(x, parent_mapping, target_regions)
+    )
+    df_no_axons = df_no_axons.dropna(subset=["parent_region_pre"])
+    df_no_axons = df_no_axons.dropna(subset=["parent_region_post"])
+    df_no_axons = df_no_axons.rename(columns={"0": "connectivity_count"})
+    df_no_axons = df_no_axons[df_no_axons["connectivity_count"] > 0]
+
+    df_axons["parent_region_pre"] = df_axons["idx-region_pre"].apply(
+        lambda x: find_parent_acronym(x, parent_mapping, target_regions)
+    )
+    df_axons["parent_region_post"] = df_axons["idx-region_post"].apply(
+        lambda x: find_parent_acronym(x, parent_mapping, target_regions)
+    )
+    df_axons = df_axons.dropna(subset=["parent_region_pre"])
+    df_axons = df_axons.dropna(subset=["parent_region_post"])
+    df_axons = df_axons.rename(columns={"0": "connectivity_count"})
+    df_axons = df_axons[df_axons["connectivity_count"] > 0]
+
+    df_no_axons = df_no_axons[["parent_region_pre", "parent_region_post", "connectivity_count"]]
+    df_axons = df_axons[["parent_region_pre", "parent_region_post", "connectivity_count"]]
+    # df_no_axons.to_csv(
+    #     os.path.split(df_no_axons_path)[0] + "/connectivity_with_parents_no_axons.csv"
+    # )
+    # df_axons.to_csv(os.path.split(df_axons_path)[0] + "/connectivity_with_parents_axons.csv")
+    unique_regions = pd.concat([df_no_axons, df_axons])["parent_region_pre"].unique()
+
+    # define a consistent color map across plots
+    color_palette = sns.color_palette("tab20", len(unique_regions))
+    color_map = {region: color for region, color in zip(unique_regions, color_palette)}
+    matrix_local = Matrix.parse_fromto_table(df_no_axons)
+    matrix_long = Matrix.parse_fromto_table(df_axons)
+    chord_local = Circos.initialize_from_matrix(
+        matrix_local,
+        space=3,
+        cmap=color_map,
+        label_kws=dict(rotation=90),
+        link_kws=dict(direction=1, ec="black", lw=0.5),
+    )
+    chord_long = Circos.initialize_from_matrix(
+        matrix_long,
+        space=3,
+        cmap=color_map,
+        link_kws=dict(direction=1, ec="black", lw=0.5),
+    )
+    chord_local.savefig(os.path.split(df_axons_path)[0] + "/chord_local.pdf")
+    chord_long.savefig(os.path.split(df_axons_path)[0] + "/chord_with_long_range.pdf")
+
+    # plot also the difference long_range - local
+    df_diff = df_axons.copy()
+    df_diff["connectivity_count"] = (
+        df_axons["connectivity_count"] - df_no_axons["connectivity_count"]
+    )
+
+    matrix_diff = Matrix.parse_fromto_table(df_diff)
+    chord_diff = Circos.initialize_from_matrix(
+        matrix_diff,
+        space=3,
+        cmap=color_map,
+        link_kws=dict(direction=1, ec="black", lw=0.5),
+    )
+    chord_diff.savefig(os.path.split(df_axons_path)[0] + "/chord_long_range_only.pdf")
+
+    # plot also a version with only outgoing connections
+    df_out_local = df_no_axons.copy()
+    df_out_long = df_axons.copy()
+    # remove entries where parent_region_pre equals parent_region_post
+    df_out_local = df_out_local[
+        df_out_local["parent_region_pre"] != df_out_local["parent_region_post"]
+    ]
+    df_out_long = df_out_long[df_out_long["parent_region_pre"] != df_out_long["parent_region_post"]]
+    matrix_out_local = Matrix.parse_fromto_table(df_out_local)
+    matrix_out_long = Matrix.parse_fromto_table(df_out_long)
+    chord_out_local = Circos.initialize_from_matrix(
+        matrix_out_local,
+        space=3,
+        cmap=color_map,
+        link_kws=dict(direction=1, ec="black", lw=0.5),
+    )
+    chord_out_long = Circos.initialize_from_matrix(
+        matrix_out_long,
+        space=3,
+        cmap=color_map,
+        link_kws=dict(direction=1, ec="black", lw=0.5),
+    )
+    chord_out_local.savefig(os.path.split(df_axons_path)[0] + "/chord_out_local.pdf")
+    chord_out_long.savefig(os.path.split(df_axons_path)[0] + "/chord_out_with_long_range.pdf")
+
+
 def plot_hemispheres(
     df_bio_path,
     df_synth_path,
     source="MOp5",
     regions_subset=["MOp", "MOs", "SSp", "SSs", "CP", "PG", "SPVI"],
     out_path="./",
-    atlas_hierarchy="/gpfs/bbp.cscs.ch/project/proj148/scratch/"
-    "circuits/20240531/.atlas/hierarchy.json",
+    atlas_hierarchy="/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/"
+    "atlas_aleksandra/atlas-release-mouse-barrels-density-mod/hierarchy.json",
 ):
     """Plot hemispheres targeting."""
     os.makedirs(out_path, exist_ok=True)
@@ -1192,7 +1387,7 @@ def plot_hemispheres(
 
     # Define colors for each parent_region
     colors = plt.cm.tab20.colors  # pylint: disable=no-member
-    color_dict = dict(zip(tuft_counts_bio_df["parent_region"].unique(), colors))
+    color_dict = dict(zip(np.sort(tuft_counts_bio_df["parent_region"].unique()), colors))
     source_hemispheres = tuft_counts_bio_df["source_hemisphere"].unique()
     _, ax = plt.subplots(2, 2, figsize=(10, 10))
 
@@ -1282,7 +1477,7 @@ def plot_results(config, verify=False):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     if len(sys.argv) != 3:
-        print("Usage: python plot_results.py <config_file> <verify_bool>")
+        print("Usage: python plot_results.py <config_file> {verify|whatever}")
         sys.exit(1)
     logging.debug("Running plot_results.py with config %s and verify %s", sys.argv[1], sys.argv[2])
     config_ = configparser.ConfigParser()

@@ -263,7 +263,8 @@ def process_morphology(
     if len(rows_all_terms) > 0:
         res_queue_all_terms.put(rows_all_terms)
     else:
-        res_queue_all_terms.close()
+        logging.warning(f"No terminal points found for morph {morph_file} !")
+        res_queue_all_terms.put(rows_all_terms)
     # count the number of terminals for each region
     n_terms_per_regions = Counter(terminals_regions)
     # and add this data to the axon dict
@@ -481,7 +482,7 @@ def main(config):
 
 if __name__ == "__main__":
     log_format = "%(asctime)s [%(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
-    logging.basicConfig(level=logging.DEBUG, format=log_format, force=True)
+    logging.basicConfig(level=logging.INFO, format=log_format, force=True)
 
     config_ = configparser.ConfigParser()
     config_.read(sys.argv[1])
