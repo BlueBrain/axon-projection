@@ -447,7 +447,7 @@ def aggregate_regions_columns(df, regions_subset):
     return df
 
 
-# pylint: disable=too-many-statements, dangerous-default-value
+# pylint: disable=too-many-statements, dangerous-default-value, too-many-locals
 def compare_feat_in_regions(
     df_bio_path,
     df_synth_path,
@@ -1252,21 +1252,21 @@ def plot_chord_diagram(
 
     # define a consistent color map across plots
     color_palette = sns.color_palette("tab20", len(unique_regions))
-    color_map = {region: color for region, color in zip(unique_regions, color_palette)}
+    color_map = dict(zip(unique_regions, color_palette))
     matrix_local = Matrix.parse_fromto_table(df_no_axons)
     matrix_long = Matrix.parse_fromto_table(df_axons)
     chord_local = Circos.initialize_from_matrix(
         matrix_local,
         space=3,
         cmap=color_map,
-        label_kws=dict(rotation=90),
-        link_kws=dict(direction=1, ec="black", lw=0.5),
+        label_kws={"rotation": 90},
+        link_kws={"direction": 1, "ec": "black", "lw": 0.5},
     )
     chord_long = Circos.initialize_from_matrix(
         matrix_long,
         space=3,
         cmap=color_map,
-        link_kws=dict(direction=1, ec="black", lw=0.5),
+        link_kws={"direction": 1, "ec": "black", "lw": 0.5},
     )
     chord_local.savefig(os.path.split(df_axons_path)[0] + "/chord_local.pdf")
     chord_long.savefig(os.path.split(df_axons_path)[0] + "/chord_with_long_range.pdf")
@@ -1282,7 +1282,7 @@ def plot_chord_diagram(
         matrix_diff,
         space=3,
         cmap=color_map,
-        link_kws=dict(direction=1, ec="black", lw=0.5),
+        link_kws={"direction": 1, "ec": "black", "lw": 0.5},
     )
     chord_diff.savefig(os.path.split(df_axons_path)[0] + "/chord_long_range_only.pdf")
 
@@ -1300,13 +1300,13 @@ def plot_chord_diagram(
         matrix_out_local,
         space=3,
         cmap=color_map,
-        link_kws=dict(direction=1, ec="black", lw=0.5),
+        link_kws={"direction": 1, "ec": "black", "lw": 0.5},
     )
     chord_out_long = Circos.initialize_from_matrix(
         matrix_out_long,
         space=3,
         cmap=color_map,
-        link_kws=dict(direction=1, ec="black", lw=0.5),
+        link_kws={"direction": 1, "ec": "black", "lw": 0.5},
     )
     chord_out_local.savefig(os.path.split(df_axons_path)[0] + "/chord_out_local.pdf")
     chord_out_long.savefig(os.path.split(df_axons_path)[0] + "/chord_out_with_long_range.pdf")
