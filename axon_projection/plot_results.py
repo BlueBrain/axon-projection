@@ -17,7 +17,7 @@ import seaborn as sns
 from matplotlib.colors import LogNorm
 from pycirclize import Circos
 from pycirclize.parser import Matrix
-from scipy.stats import linregress
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from synthesis_workflow.validation import mvs_score
 
@@ -447,6 +447,17 @@ def aggregate_regions_columns(df, regions_subset):
     return df
 
 
+def set_font_size(font_size=18):
+    """Set the font size of everything on a matplotlib plot."""
+    plt.rc("font", size=font_size)
+    plt.rc("axes", titlesize=font_size)
+    plt.rc("axes", labelsize=font_size + 2)
+    plt.rc("xtick", labelsize=font_size)
+    plt.rc("ytick", labelsize=font_size)
+    plt.rc("legend", fontsize=font_size)
+    plt.rc("figure", titlesize=font_size + 3)
+
+
 # pylint: disable=too-many-statements, dangerous-default-value, too-many-locals
 def compare_feat_in_regions(
     df_bio_path,
@@ -465,6 +476,7 @@ def compare_feat_in_regions(
 
     sns.set()
     mpl.rcdefaults()  # Reset to defaults
+    set_font_size()
     # filter on just the source region of interest
     bio_feat_df = bio_feat_df[bio_feat_df["source"].apply(without_hemisphere) == source]
     synth_feat_df = synth_feat_df[synth_feat_df["source"].apply(without_hemisphere) == source]
@@ -567,7 +579,7 @@ def compare_feat_in_regions(
     # Combine the two DataFrames
     combined_df = pd.concat([bio_feat_df, synth_feat_df])
 
-    plt.rcParams.update({"font.size": 14})  # Set default fontsize
+    # plt.rcParams.update({"font.size": 18})  # Set default fontsize
     plt.figure(figsize=(10, 10))
     # for the bar plot for number of axons
     ax2 = plt.subplot(3, 1, 1)
@@ -642,7 +654,7 @@ def compare_feat_in_regions(
         print(synth_data["Region"].unique())
         print(
             f"region {region} has {len(bio_data['Region'].unique())} bio "
-            "and {len(synth_data['Region'].unique())} synth"
+            f"and {len(synth_data['Region'].unique())} synth"
         )
 
         # bio_count = len(bio_data)
@@ -975,8 +987,9 @@ def compare_lengths_vs_connectivity(
     df_bio = pd.read_csv(df_bio_path, index_col=0)
     df_synth = pd.read_csv(df_synth_path)
 
-    df_bio = df_bio[df_bio["source"] == source]
+    df_bio = df_bio[df_bio["source"].str.contains(source)]
     df_synth = df_synth[df_synth["idx-region_pre"].str.contains(source)]
+    set_font_size()
 
     with open(atlas_hierarchy, encoding="utf-8") as f:
         hierarchy_data = json.load(f)
@@ -995,7 +1008,7 @@ def compare_lengths_vs_connectivity(
     df_bio = df_bio.reset_index()
 
     df_bio["parent_region"] = df_bio["target"].apply(
-        lambda x: find_parent_acronym(x, parent_mapping, target_regions)
+        lambda x: find_parent_acronym(without_hemisphere(x), parent_mapping, target_regions)
     )
     df_bio = df_bio.dropna(subset=["parent_region"])
     # drop also rows where total_length == 0
@@ -1066,57 +1079,60 @@ def compare_lengths_vs_connectivity(
     fig.savefig(os.path.split(df_synth_path)[0] + "/lengths_vs_connectivity.pdf")
 
     # do a scatter plot of lengths vs connectivity, each point is a region
+    df = pd.DataFrame({"bio_lengths": dict_bio_lengths, "synth_conns": dict_synth_conns})
     fig, ax = plt.subplots(figsize=(5, 5))
-    ax.scatter(dict_bio_lengths.values(), dict_synth_conns.values())
-    # add a label that gives the region for each point
-    for i, region in enumerate(dict_bio_lengths.keys()):
-        ax.annotate(region, (dict_bio_lengths[region], dict_synth_conns[region]), fontsize=8)
-    # set log scale
-    # ax.set_yscale("log")
-    # ax.set_xscale("log")
-    # plot also a linear regression line
-    bio_lengths = np.array(list(dict_bio_lengths.values()))
-    synth_conns = np.array(list(dict_synth_conns.values()))
+    # Reshape the data for scikit-learn
+    X = df["bio_lengths"].values.reshape(-1, 1)
+    y = df["synth_conns"].values
+    # Perform linear regression with intercept = 0
+    model = LinearRegression(fit_intercept=False)
+    model.fit(X, y)
+    slope = model.coef_[0]
+    # Predict using the model to get the regression line
+    y_pred = model.predict(X)
+    # Calculate the R^2 value
+    r_squared = r2_score(y, y_pred)
 
-    # Performing linear regression
-    slope, intercept, r_value, _, _ = linregress(bio_lengths, synth_conns)
-    # Creating the regression line
-    regression_line = slope * bio_lengths + intercept
     ax.plot(
-        bio_lengths, regression_line, color="red", label=f"Fit line: y={slope:.2f}x+{intercept:.2f}"
+        df["bio_lengths"],
+        y_pred,
+        color="red",
+        label=f"Fit line: y={slope:.3f}x \n$R^2$ = {r_squared:.3f}",
     )
     # Adding the slope and R^2 value
-    textstr = f"Slope: {slope:.2f}\n$R^2$: {r_value**2:.2f}"
-    ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=10, verticalalignment="top")
+    textstr = f"Slope: {slope:.2f}\n$R^2$: {r_squared**2:.2f}"
+    ax.text(0.05, 0.95, textstr, transform=ax.transAxes, verticalalignment="top")
 
     ax.set_xlabel(r"Total axon length [$\mu$m]")
     ax.set_ylabel("Number of connections")
     ax.set_title("Total axon length vs. number of connections in " + source)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    ax.scatter(df["bio_lengths"], df["synth_conns"], s=30)
+
+    fig.legend()
     fig.savefig(os.path.split(df_synth_path)[0] + "/lengths_vs_connectivity_scatter.pdf")
 
     # save also a log version
     # Clear the previous regression line and text
     fig, ax = plt.subplots(figsize=(3, 3))
+    set_font_size(16)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     # Recreate the scatter plot
-    ax.scatter(bio_lengths, synth_conns)
-    for i, region in enumerate(dict_bio_lengths.keys()):
-        ax.annotate(region, (bio_lengths[i], synth_conns[i]), fontsize=8)
+    ax.scatter(df["bio_lengths"], df["synth_conns"], s=20)
+    for i, key in enumerate(df.index):
+        ax.annotate(key, (df["bio_lengths"][i], df["synth_conns"][i]))
     ax.set_yscale("log")
     ax.set_xscale("log")
     # Plot the regression line on log-log scale
     ax.plot(
-        np.sort(bio_lengths),
-        np.sort(regression_line),
+        np.sort(df["bio_lengths"]),
+        np.sort(y_pred),
         color="red",
-        label=f"Fit line: y={10**intercept:.2f}x^{slope:.2f}",
+        label=f"Fit line: y=x^{slope:.2f}",
     )
-    # Adding the slope and R^2 value
-    textstr = f"Slope: {slope:.2f}\n$R^2$: {r_value**2:.2f}"
-    ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=10, verticalalignment="top")
+
     fig.savefig(os.path.split(df_synth_path)[0] + "/lengths_vs_connectivity_scatter_log.pdf")
 
 
@@ -1164,6 +1180,7 @@ def compare_connectivity(
 
     # finally, plot the local vs l-r connectivity for the parent regions
     fig, ax = plt.subplots()
+    set_font_size()
 
     # Define RGBA color for 'tab:blue' with alpha = 0.5
     tab_green_rgb = mcolors.to_rgb("tab:green")
