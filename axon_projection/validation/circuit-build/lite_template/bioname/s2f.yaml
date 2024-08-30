@@ -1,0 +1,31 @@
+- estimate_syns_con:
+    formula: 6 * ((n - 1) ** 0.5) - 1
+    formula_ee: 1.5 * n
+    max_value: 25.0
+    sample:
+      post: VISp@left-central_column-300.0um
+      pre: VISp@left-central_column-300.0um
+      size: 1000
+- experimental_syns_con:
+    bio_data: /gpfs/bbp.cscs.ch/project/proj148/scratch/circuits/20240314/bioname/s2f_data/nsyn_per_connection_20240416.tsv
+- estimate_bouton_reduction:
+    bio_data: /gpfs/bbp.cscs.ch/project/proj148/scratch/circuits/20240314/bioname/s2f_data/bouton_density_20161102.tsv
+    sample:
+      assume_syns_bouton: 1.0
+      mask: VISp@left-central_column-300.0um
+      size: 10000
+      target: VISp@left-central_column-300.0um
+- estimate_individual_bouton_reduction:
+    bio_data: /gpfs/bbp.cscs.ch/project/proj148/scratch/circuits/20240314/bioname/s2f_data/bouton_density_20161102.tsv
+    sample:
+      assume_syns_bouton: 1.0
+      mask: VISp@left-central_column-300.0um
+      size: 1000
+      target: VISp@left-central_column-300.0um
+- generalized_cv:
+    cv: 0.32
+- override_mtype:
+    bouton_reduction_factor: 1.0
+    mtype_pattern: CHC
+    pMu_A: 0.0
+    p_A: 1.0

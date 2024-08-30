@@ -32,6 +32,20 @@ def basal_dendrite_filter(n):
     return n.type == nm.BASAL_DENDRITE
 
 
+def get_soma_pos(morph):
+    """Get the soma position."""
+    soma_pos = morph.soma.center
+    if soma_pos is None or (isinstance(soma_pos, list) and len(soma_pos) == 0):
+        soma_pos = np.mean(
+            [sec.points[0] for sec in iter_sections(morph, neurite_filter=basal_dendrite_filter)],
+            axis=0,
+        )[
+            0:3
+        ]  # exclude radius if it is present
+
+    return soma_pos
+
+
 def find_and_register_source_region(
     morph, region_names, brain_regions, region_map, hierarchy_level, hierarchy_file
 ):
@@ -48,17 +62,7 @@ def find_and_register_source_region(
         source_region (str): the acronym of the source region.
         region_names (dict): the updated dictionary that contains the region names.
     """
-    source_pos = morph.soma.center
-    # source_pos = morph.soma.get_center()
-    # if morph doesn't have a soma, take the average of the first points of
-    # each sections of basal dendrites as source pos
-    if source_pos is None or (isinstance(source_pos, list) and len(source_pos) == 0):
-        source_pos = np.mean(
-            [sec.points[0] for sec in iter_sections(morph, neurite_filter=basal_dendrite_filter)],
-            axis=0,
-        )[
-            0:3
-        ]  # exclude radius if it is present
+    source_pos = get_soma_pos(morph)
 
     # get the source region
     source_asc = region_map.get(brain_regions.lookup(source_pos), "acronym", with_ascendants=True)

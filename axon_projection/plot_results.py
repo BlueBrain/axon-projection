@@ -55,7 +55,7 @@ def compare_feature_vectors(config):
         figsize=(nb_regions / 4.0, 10 * (len(feature_vectors) + 1)),
         sharex=True,
     )
-
+    set_font_size(14)
     feature_vec_df_0 = pd.Series()
     for i, feature_vector in enumerate(feature_vectors):
         # load the feature vector
@@ -96,7 +96,7 @@ def compare_feature_vectors(config):
                 np.max(np.abs(feature_vec_df_diff)) * 1.1,
             )
             l_ = feature_vec_df_norm
-            plot_N_t_vs_l(N_t, l_, "all", config)
+            plot_N_t_vs_l(N_t, l_, "all", config["output"]["path"])
 
         # plot the feature vector as a barplot
         ax[i].bar(np.arange(len(feature_vec_df_norm)), feature_vec_df_norm.to_numpy())
@@ -195,7 +195,7 @@ def compare_feature_vectors_by_source(config):
                     np.max(np.abs(feature_vec_df_diff)) * 1.1,
                 )
                 l_ = feature_vec_df_norm
-                plot_N_t_vs_l(N_t, l_, source.replace("/", "-"), config)
+                plot_N_t_vs_l(N_t, l_, source.replace("/", "-"), config["output"]["path"])
 
             # plot the feature vector as a barplot
             ax[0].bar(
@@ -241,24 +241,37 @@ def compare_feature_vectors_by_source(config):
         plt.close(fig)
 
 
-def plot_N_t_vs_l(N_t, l_, fig_name, config):
+def plot_N_t_vs_l(N_t, l_, fig_name, out_path):
     """Plots number of terminals vs path length in regions."""
-    fig, ax = plt.subplots(figsize=(5, 5))
-    ax.scatter(N_t, l_)
+    fig, ax = plt.subplots(figsize=(4, 4))
+    ax.scatter(N_t, l_, s=30)
     ax.set_xlabel("Number of terminals (normalized)")
     ax.set_ylabel("Path length (normalized)")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
     # plot a line y = x
-    ax.plot([np.min(N_t), np.max(N_t)], [np.min(N_t), np.max(N_t)], color="red", linestyle="dashed")
-
+    # ax.plot([np.min(N_t), np.max(N_t)],
+    # [np.min(N_t), np.max(N_t)], color="red", linestyle="dashed")
+    model = LinearRegression(fit_intercept=False)
+    X = N_t.to_numpy().reshape(-1, 1)
+    y = l_
+    model.fit(X, y)
+    slope = model.coef_[0]
+    # Predict using the model to get the regression line
+    y_pred = model.predict(X)
+    # Calculate the R^2 value
+    r_squared = r2_score(y, y_pred)
+    ax.plot(X, y_pred, color="red")
     # put the R^2 value on the plot
-    ax.text(0.05, 0.9, "R^2 = " + str(round(r2_score(N_t, l_), 2)), transform=ax.transAxes)
+    textstr = f"Slope: {slope:.3f}\n$R^2$: {r_squared:.3f}"
+    ax.text(0.05, 0.9, textstr, transform=ax.transAxes)
 
-    fig.savefig(config["output"]["path"] + "plots/N_t_vs_l_" + fig_name + ".pdf")
-    print("Saved " + config["output"]["path"] + "plots/N_t_vs_l_" + fig_name + ".pdf")
+    fig.savefig(out_path + "plots/N_t_vs_l_" + fig_name + ".pdf")
+    print("Saved " + out_path + "plots/N_t_vs_l_" + fig_name + ".pdf")
     # put log scale on the x and y axes
     ax.set_xscale("log")
     ax.set_yscale("log")
-    fig.savefig(config["output"]["path"] + "plots/N_t_vs_l_log_" + fig_name + ".pdf")
+    fig.savefig(out_path + "plots/N_t_vs_l_log_" + fig_name + ".pdf")
     plt.close(fig)
 
 
@@ -721,8 +734,8 @@ def compare_feat_in_regions(
         label="Synthesized",
     )
     axTot.set_ylabel("Total length per axon [μm]")
-    axTot.set_ylim(0, max(*dict_tot_bio.values(), *dict_tot_synth.values()))
-
+    # axTot.set_ylim(0, max(*dict_tot_bio.values(), *dict_tot_synth.values()))
+    axTot.set_yscale("log")
     axTot.set_xlabel("Brain region")
     if feature_vec == "lengths":
         # Add title and labels
@@ -736,7 +749,7 @@ def compare_feat_in_regions(
     plt.legend()
 
     # Show the plot
-    plt.savefig(out_path + "compare_" + feature_vec + "_distrib.pdf")
+    plt.savefig(out_path + "compare_" + feature_vec + "_distrib_log.pdf")
     # pylint: disable=logging-not-lazy
     logging.info("Saved plot to " + out_path + "compare_" + feature_vec + "_distrib.pdf")
     plt.close()
@@ -1100,7 +1113,7 @@ def compare_lengths_vs_connectivity(
         label=f"Fit line: y={slope:.3f}x \n$R^2$ = {r_squared:.3f}",
     )
     # Adding the slope and R^2 value
-    textstr = f"Slope: {slope:.2f}\n$R^2$: {r_squared**2:.2f}"
+    textstr = f"Slope: {slope:.2f}\n$R^2$: {r_squared:.2f}"
     ax.text(0.05, 0.95, textstr, transform=ax.transAxes, verticalalignment="top")
 
     ax.set_xlabel(r"Total axon length [$\mu$m]")
@@ -1140,6 +1153,7 @@ def compare_lengths_vs_connectivity(
 def compare_connectivity(
     df_no_axons_path,
     df_axons_path,
+    df_bio_axons_path=None,
     source="MOp5",
     target_regions=["MOp", "MOs", "SSp", "SSs", "CP", "PG", "VISp"],
     atlas_hierarchy="/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/"
@@ -1185,13 +1199,31 @@ def compare_connectivity(
     # Define RGBA color for 'tab:blue' with alpha = 0.5
     tab_green_rgb = mcolors.to_rgb("tab:green")
     tab_red_rgb = mcolors.to_rgb("tab:red")
+    tab_blue_rgb = mcolors.to_rgb("tab:blue")
     # Define the color palette
-    palette = {"local": tab_green_rgb, "long_range": tab_red_rgb}
-
+    palette = {"local": tab_green_rgb, "long_range": tab_red_rgb, "bio": tab_blue_rgb}
+    bar_width = 0.35
+    if df_bio_axons_path is not None:
+        bar_width = 0.2
+        df_bio_axons = pd.read_csv(df_bio_axons_path)
+        df_bio_axons["parent_region"] = df_bio_axons["idx-region_post"].apply(
+            lambda x: find_parent_acronym(x, parent_mapping, target_regions)
+        )
+        df_bio_axons = df_bio_axons.dropna(subset=["parent_region"])
+        df_bio_axons = df_bio_axons.rename(columns={"0": "connectivity_count"})
+        df_bio_axons = df_bio_axons[df_bio_axons["connectivity_count"] > 0]
+        ax.bar(
+            df_bio_axons["parent_region"],
+            df_bio_axons["connectivity_count"],
+            width=-bar_width,
+            align="edge",
+            color=palette["bio"],
+            label="Bio axons connections",
+        )
     ax.bar(
         df_no_axons["parent_region"],
         df_no_axons["connectivity_count"],
-        width=-0.35,
+        width=-bar_width,
         align="edge",
         color=palette["local"],
         label="Local axons connections",
@@ -1199,7 +1231,7 @@ def compare_connectivity(
     ax.bar(
         df_axons["parent_region"],
         df_axons["connectivity_count"],
-        width=0.35,
+        width=bar_width,
         align="edge",
         color=palette["long_range"],
         label="Long range axons connections",
@@ -1225,6 +1257,8 @@ def plot_chord_diagram(
     target_regions=["MOp", "MOs", "SSp", "SSs"],
     atlas_hierarchy="/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/"
     "atlas_aleksandra/atlas-release-mouse-barrels-density-mod/hierarchy.json",
+    source_filter=None,
+    fn_out="",
 ):
     """Compare and plot connectivity of multiple regions with and without axons."""
     # set fontsize to 16
@@ -1258,18 +1292,45 @@ def plot_chord_diagram(
     df_axons = df_axons.dropna(subset=["parent_region_post"])
     df_axons = df_axons.rename(columns={"0": "connectivity_count"})
     df_axons = df_axons[df_axons["connectivity_count"] > 0]
+    # unique_regions = pd.concat([df_no_axons, df_axons])["parent_region_pre"].unique()
+    # have them in that order
+    regions_for_color_isocortex = [
+        "ACA",
+        "FRP",
+        "MOp",
+        "MOs",
+        "ORB",
+        "PL",
+        "RSP",
+        "ILA",
+        "SSp",
+        "AUD",
+        "SSs",
+        "TEa",
+        "VISC",
+        "ECT",
+        "PERI",
+        "GU",
+    ]
+    # unique_regions = list(set(unique_regions) | set(target_regions))
+    # define a consistent color map across plots
+    color_palette = sns.color_palette("tab20", len(regions_for_color_isocortex))
+    color_map = dict(zip(regions_for_color_isocortex, color_palette))
+
+    if source_filter is not None:
+        df_no_axons = df_no_axons[df_no_axons["idx-region_pre"] == source_filter]
+        df_axons = df_axons[df_axons["idx-region_pre"] == source_filter]
+        fn_out = fn_out + "_" + source_filter
 
     df_no_axons = df_no_axons[["parent_region_pre", "parent_region_post", "connectivity_count"]]
     df_axons = df_axons[["parent_region_pre", "parent_region_post", "connectivity_count"]]
-    # df_no_axons.to_csv(
-    #     os.path.split(df_no_axons_path)[0] + "/connectivity_with_parents_no_axons.csv"
-    # )
-    # df_axons.to_csv(os.path.split(df_axons_path)[0] + "/connectivity_with_parents_axons.csv")
-    unique_regions = pd.concat([df_no_axons, df_axons])["parent_region_pre"].unique()
 
-    # define a consistent color map across plots
-    color_palette = sns.color_palette("tab20", len(unique_regions))
-    color_map = dict(zip(unique_regions, color_palette))
+    # aggregate for each parent region
+    df_no_axons = df_no_axons.groupby(
+        ["parent_region_pre", "parent_region_post"], as_index=False
+    ).sum()
+    df_axons = df_axons.groupby(["parent_region_pre", "parent_region_post"], as_index=False).sum()
+
     matrix_local = Matrix.parse_fromto_table(df_no_axons)
     matrix_long = Matrix.parse_fromto_table(df_axons)
     chord_local = Circos.initialize_from_matrix(
@@ -1285,23 +1346,8 @@ def plot_chord_diagram(
         cmap=color_map,
         link_kws={"direction": 1, "ec": "black", "lw": 0.5},
     )
-    chord_local.savefig(os.path.split(df_axons_path)[0] + "/chord_local.pdf")
-    chord_long.savefig(os.path.split(df_axons_path)[0] + "/chord_with_long_range.pdf")
-
-    # plot also the difference long_range - local
-    df_diff = df_axons.copy()
-    df_diff["connectivity_count"] = (
-        df_axons["connectivity_count"] - df_no_axons["connectivity_count"]
-    )
-
-    matrix_diff = Matrix.parse_fromto_table(df_diff)
-    chord_diff = Circos.initialize_from_matrix(
-        matrix_diff,
-        space=3,
-        cmap=color_map,
-        link_kws={"direction": 1, "ec": "black", "lw": 0.5},
-    )
-    chord_diff.savefig(os.path.split(df_axons_path)[0] + "/chord_long_range_only.pdf")
+    chord_local.savefig(os.path.split(df_no_axons_path)[0] + "/chord" + fn_out + ".pdf")
+    chord_long.savefig(os.path.split(df_axons_path)[0] + "/chord_with_long_range" + fn_out + ".pdf")
 
     # plot also a version with only outgoing connections
     df_out_local = df_no_axons.copy()
@@ -1325,8 +1371,10 @@ def plot_chord_diagram(
         cmap=color_map,
         link_kws={"direction": 1, "ec": "black", "lw": 0.5},
     )
-    chord_out_local.savefig(os.path.split(df_axons_path)[0] + "/chord_out_local.pdf")
-    chord_out_long.savefig(os.path.split(df_axons_path)[0] + "/chord_out_with_long_range.pdf")
+    chord_out_local.savefig(os.path.split(df_no_axons_path)[0] + "/chord_out" + fn_out + ".pdf")
+    chord_out_long.savefig(
+        os.path.split(df_axons_path)[0] + "/chord_out_with_long_range" + fn_out + ".pdf"
+    )
 
 
 def plot_hemispheres(
@@ -1485,7 +1533,7 @@ def plot_hemispheres(
 def plot_results(config, verify=False):
     """Plots all the results."""
     makedirs(config["output"]["path"] + "plots/", exist_ok=True)
-    plot_clusters(config, verify)
+    # plot_clusters(config, verify)
     if not verify:
         compare_feature_vectors(config)
         compare_feature_vectors_by_source(config)

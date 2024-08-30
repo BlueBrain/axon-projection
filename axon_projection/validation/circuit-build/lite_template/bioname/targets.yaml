@@ -1,0 +1,8 @@
+targets:
+  query_based:
+    Layer1: {'layer': '1'}
+    Layer2: {'layer': '2'}
+    Layer3: {'layer': '3'}
+    Layer4: {'layer': '4'}
+    Layer5: {'layer': '5'}
+    Layer6: {'layer': '6'}

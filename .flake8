@@ -3,5 +3,9 @@ ignore =
 	# E203: whitespace before ':'
 	E203,
 	# W503: line break before binary operator
-	W503
+	W503,
+	# E722 do not use bare 'except'
+	E722,
+	# E402 module level import not at top of file
+	E402
 max-line-length = 100

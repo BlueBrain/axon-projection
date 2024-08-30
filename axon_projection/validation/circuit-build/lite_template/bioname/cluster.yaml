@@ -1,0 +1,74 @@
+__default__:
+  salloc: -A proj135 -p prod_small --time=1:00:00 --mem=0
+# adapt_emodels:
+  # env_vars:
+  #   DASK_DISTRIBUTED__ADMIN__TICK__LIMIT: 3h
+  #   DASK_DISTRIBUTED__COMM__TIMEOUTS__CONNECT: 200000ms
+  #   DASK_DISTRIBUTED__COMM__TIMEOUTS__TCP: 200000ms
+  #   DASK_DISTRIBUTED__LOGGING__DISTRIBUTED: info
+  #   DASK_DISTRIBUTED__WORKER__DAEMON: 'True'
+  #   DASK_DISTRIBUTED__WORKER__MEMORY__PAUSE: '0.80'
+  #   DASK_DISTRIBUTED__WORKER__MEMORY__SPILL: 'False'
+  #   DASK_DISTRIBUTED__WORKER__MEMORY__TARGET: 'False'
+  #   DASK_DISTRIBUTED__WORKER__MEMORY__TERMINATE: '0.95'
+  #   DASK_DISTRIBUTED__WORKER__MULTIPROCESSING_METHOD: spawn
+  #   DASK_DISTRIBUTED__WORKER__PROFILE__CYCLE: 1000000ms
+  #   DASK_DISTRIBUTED__WORKER__PROFILE__INTERVAL: 10000ms
+  #   DASK_DISTRIBUTED__WORKER__USE_FILE_LOCKING: 'False'
+  # salloc: -A proj135 -p prod -C nvme -n100 --mem 0 --time 24:00:00
+assign_emodels:
+  salloc: -A proj135 -p prod_small --time 1:30:00 --mem 32G
+choose_morphologies:
+  salloc: -A proj135 -p prod --nodes 10 --time=5:00:00 --mem=0
+compute_currents:
+  env_vars:
+    DASK_DISTRIBUTED__ADMIN__TICK__LIMIT: 3h
+    DASK_DISTRIBUTED__COMM__TIMEOUTS__CONNECT: 200000ms
+    DASK_DISTRIBUTED__COMM__TIMEOUTS__TCP: 200000ms
+    DASK_DISTRIBUTED__LOGGING__DISTRIBUTED: info
+    DASK_DISTRIBUTED__WORKER__DAEMON: 'True'
+    DASK_DISTRIBUTED__WORKER__MEMORY__PAUSE: '0.80'
+    DASK_DISTRIBUTED__WORKER__MEMORY__SPILL: 'False'
+    DASK_DISTRIBUTED__WORKER__MEMORY__TARGET: 'False'
+    DASK_DISTRIBUTED__WORKER__MEMORY__TERMINATE: '0.95'
+    DASK_DISTRIBUTED__WORKER__MULTIPROCESSING_METHOD: spawn
+    DASK_DISTRIBUTED__WORKER__PROFILE__CYCLE: 1000000ms
+    DASK_DISTRIBUTED__WORKER__PROFILE__INTERVAL: 10000ms
+    DASK_DISTRIBUTED__WORKER__USE_FILE_LOCKING: 'False'
+  salloc: -A proj135 -p prod -C clx -n1000 --mem 0 --time 24:00:00
+parquet_to_sonata:
+  salloc: -A proj135 -p prod -C cpu -n64 --time 1:00:00 --mem 0
+place_cells:
+  salloc: -A proj135 -p prod_small --time=2:00:00 --mem=0
+spatial_index_segment:
+  jobname: synapse_index
+  salloc: -A proj135 -p prod --constraint=cpu --time 12:00:00 -n 73 --mem 0 --exclusive
+spatial_index_synapse:
+  jobname: synapse_index
+  salloc: '-A proj135 -p prod --constraint=cpu --time 5:00:00 -n5'
+spykfunc_s2f:
+  salloc: -A proj135 -p prod -C nvme -c 72 -N2 --exclusive --mem 0 --time 4:00:00
+spykfunc_s2s:
+  salloc: -A proj135 -p prod -C nvme -N2 --exclusive --mem 0 --time 2:00:00
+synthesize_morphologies:
+  env_vars:
+    DASK_DISTRIBUTED__ADMIN__TICK__LIMIT: 3h
+    DASK_DISTRIBUTED__COMM__TIMEOUTS__CONNECT: 200000ms
+    DASK_DISTRIBUTED__COMM__TIMEOUTS__TCP: 200000ms
+    DASK_DISTRIBUTED__LOGGING__DISTRIBUTED: info
+    DASK_DISTRIBUTED__WORKER__DAEMON: 'True'
+    DASK_DISTRIBUTED__WORKER__MEMORY__PAUSE: '0.80'
+    DASK_DISTRIBUTED__WORKER__MEMORY__SPILL: 'False'
+    DASK_DISTRIBUTED__WORKER__MEMORY__TARGET: 'False'
+    DASK_DISTRIBUTED__WORKER__MEMORY__TERMINATE: '0.95'
+    DASK_DISTRIBUTED__WORKER__MULTIPROCESSING_METHOD: spawn
+    DASK_DISTRIBUTED__WORKER__PROFILE__CYCLE: 1000000ms
+    DASK_DISTRIBUTED__WORKER__PROFILE__INTERVAL: 10000ms
+    DASK_DISTRIBUTED__WORKER__USE_FILE_LOCKING: 'False'
+  salloc: -A proj135 -p prod -C clx --tasks-per-node 32 --mem 0 --time 8:00:00
+touch2parquet:
+  salloc: -A proj135 -p prod -C cpu -n64 --time 1:00:00 --mem 0
+touchdetector:
+  jobname: td
+  salloc: -A proj135 -p prod --nodes 20 --cpus-per-task 4 --time 18:00:00 --mem 0
+    --exclusive
