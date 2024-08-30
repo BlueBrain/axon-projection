@@ -16,9 +16,9 @@ from axon_synthesis.utils import get_morphology_paths
 from matplotlib.colors import ListedColormap
 from PIL import Image
 
-# from scipy.ndimage import gaussian_filter
-
 from axon_projection.query_atlas import without_hemisphere
+
+# from scipy.ndimage import gaussian_filter
 
 
 def plot_all_morphs(morphs_list, axon_color, batch_size, n_morphs_to_plot):
