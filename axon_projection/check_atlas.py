@@ -2,62 +2,56 @@
 
 import configparser
 import logging
+import os
 import sys
 
 import pandas as pd
 from voxcell import RegionMap
 
+from axon_projection.query_atlas import without_hemisphere
+
 
 def compare_axonal_projections(config):
     """Compares the axonal projections in 'path_1' and 'path_2'."""
     # Read the input data from the specified paths
-    df_1 = pd.read_csv(config["compare_axonal_projections"]["path_1"])
-    df_2 = pd.read_csv(config["compare_axonal_projections"]["path_2"])
+    df_1 = pd.read_csv(config["compare_axonal_projections"]["path_1"], index_col=0)
+    df_2 = pd.read_csv(config["compare_axonal_projections"]["path_2"], index_col=0)
     # remove all the '_O' suffixes from the columns headers
     df_1.columns = df_1.columns.str.replace("_O", "")
     df_2.columns = df_2.columns.str.replace("_O", "")
+    df_1["name"] = df_1["morph_path"].apply(lambda x: os.path.basename(x))
+    df_2["name"] = df_2["morph_path"].apply(lambda x: os.path.basename(x))
 
-    # first, compare the column headers of the two dfs
-    if not df_1.columns.equals(df_2.columns):
-        logging.warning("Column headers of the two dataframes are different.")
-        logging.warning("Column headers of df_1: %s", df_1.columns)
-        logging.warning("Column headers of df_2: %s", df_2.columns)
-        rows_diff = []
-        # if columns are not the same, compare rows one by one
-        for _, row in df_1.iterrows():
-            logging.debug("Morph %s, source %s", row["morph_path"], row["source"].replace("_O", ""))
-            numeric_values_df1 = row.apply(pd.to_numeric, errors="coerce")
-            numeric_values_df1 = numeric_values_df1[numeric_values_df1 > 0]
-            logging.debug("DF 1 terminals: \n%s", numeric_values_df1)
+    logging.warning("Column headers of df_1: %s", df_1.columns)
+    logging.warning("Column headers of df_2: %s", df_2.columns)
+    rows_diff = []
+    # if columns are not the same, compare rows one by one
+    for _, row in df_1.iterrows():
+        # logging.debug("Morph %s, source %s", row["morph_path"], row["source"].replace("_O", ""))
+        numeric_values_df1 = row.apply(pd.to_numeric, errors="coerce")
+        numeric_values_df1 = numeric_values_df1[numeric_values_df1 > 0]
+        # logging.debug("DF 1 terminals: \n%s", numeric_values_df1)
+        row_df_2 = df_2[df_2["name"] == row["name"]]
+        dict_cmp = {"morph_path": row["morph_path"], "source": row["source"].replace("_O", "")}
+        num_diffs = 0
+        # if this morphology is not found in df2, put it entirely in the diff
+        if row_df_2.empty:
+            rows_diff.append(row)
+            continue
+        for col in row_df_2.columns:
+            if pd.to_numeric(row_df_2[col].iloc[0], errors="coerce") > 0:
+                if col in row.index:
+                    diff = row_df_2[col].iloc[0] - row[col]
+                else:
+                    diff = row_df_2[col].iloc[0]
 
-            row_df_2 = df_2[df_2["morph_path"] == row["morph_path"]]
-            dict_cmp = {"morph_path": row["morph_path"], "source": row["source"].replace("_O", "")}
-            num_diffs = 0
-            # if this morphology is not found in df2, put it entirely in the diff
-            if row_df_2.empty:
-                rows_diff.append(row)
-                continue
-            for col in row_df_2.columns:
-                if pd.to_numeric(row_df_2[col].iloc[0], errors="coerce") > 0:
-                    if col in row.index:
-                        diff = row_df_2[col].iloc[0] - row[col]
-                    else:
-                        diff = row_df_2[col].iloc[0]
-
-                    if diff != 0:
-                        dict_cmp.update({col: diff})
-                        num_diffs += 1
-            if num_diffs != 0:
-                rows_diff.append(dict_cmp)
-        diff_df = pd.DataFrame(rows_diff)
-        diff_df.to_csv(config["output"]["path"] + "compare_projections.csv", index=False)
-
-    else:
-        # Use the compare method to find differences
-        differences = df_1.compare(df_2)
-
-        # Save the differences
-        logging.info("Mismatches: %s", differences)
+                if diff != 0:
+                    dict_cmp.update({col: diff})
+                    num_diffs += 1
+        if num_diffs != 0:
+            rows_diff.append(dict_cmp)
+    diff_df = pd.DataFrame(rows_diff)
+    diff_df.to_csv(config["output"]["path"] + "compare_projections.csv", index=False)
 
 
 def region_is_in_hierarchy_at_dist(region, hierarchy, dist):
@@ -121,41 +115,48 @@ def compare_source_regions(config):
     )
     manual_path = config["compare_source_regions"]["manual_annotation_path"]
     output_path = config["output"]["path"]
-    col_name_id = config["compare_source_regions"]["col_name_id"]
+    # col_name_id = config["compare_source_regions"]["col_name_id"]
     col_name_region = config["compare_source_regions"]["col_name_region"]
     compare_on_col = config["compare_source_regions"]["compare_on"]
+    hierarchy_file = config["atlas"]["path"] + "/" + config["atlas"]["hierarchy"]
 
-    df_atlas = pd.read_csv(from_atlas_path)
+    df_atlas = pd.read_csv(from_atlas_path, index_col=0)
     # if we have manual annotation of source regions
     if manual_path:
-        df_manual = pd.read_csv(manual_path)
-        df_manual = df_manual.rename(columns={col_name_id: "name"})
-
-        df_cmp = df_atlas.merge(df_manual, on="name", validate="one_to_one")
-        df_cmp = df_cmp[["name", "source", "source_label", col_name_region]]
+        df_manual = pd.read_csv(manual_path, index_col=0)
+        print(df_manual)
+        df_cmp = df_atlas.merge(df_manual, on="name", how="inner")
+        print(df_cmp)
+        df_cmp = df_cmp[["name", compare_on_col, col_name_region]]
         df_cmp = df_cmp.rename(
-            columns={compare_on_col: "source_from_atlas", col_name_region: "manual_source"}
+            columns={compare_on_col: "source_from_analysis", col_name_region: "manual_source"}
         )
-        num_correct_source = len(df_cmp[df_cmp["source_from_atlas"] == df_cmp["manual_source"]])
+        num_correct_source = len(df_cmp[df_cmp["source_from_analysis"] == df_cmp["manual_source"]])
         # save in another df the mismatches between the two
-        df_mismatch = df_cmp[df_cmp["source_from_atlas"] != df_cmp["manual_source"]]
+        df_mismatch = df_cmp[df_cmp["source_from_analysis"] != df_cmp["manual_source"]]
         if len(df_mismatch) > 0:
             df_mismatch.to_markdown(output_path + "compare_regions_mismatch.md")
         logging.info("Source regions match: %.2f %%", 100.0 * num_correct_source / len(df_cmp))
     # if we don't have a manual annotation, just output the atlas source region and its hierarchy
     else:
         df_cmp = df_atlas[["name", "source"]]
-        df_cmp = df_cmp.rename(columns={"source": "source_from_atlas"})
+        df_cmp = df_cmp.rename(columns={"source": "source_from_analysis"})
 
     # add the full hierarchy of the source region from atlas for more info
-    region_map = RegionMap.load_json("mba_hierarchy.json")
+    region_map = RegionMap.load_json(hierarchy_file)
     rows_hierarchy = [
-        region_map.get(region_map.find(acr, "acronym").pop(), "acronym", with_ascendants=True)
-        for acr in df_cmp["source"]
+        region_map.get(
+            region_map.find(without_hemisphere(acr), "acronym").pop(),
+            "acronym",
+            with_ascendants=True,
+        )
+        for acr in df_cmp["source_from_analysis"]
     ]
     rows_hierarchy_names = [
-        region_map.get(region_map.find(acr, "acronym").pop(), "name", with_ascendants=True)
-        for acr in df_cmp["source"]
+        region_map.get(
+            region_map.find(without_hemisphere(acr), "acronym").pop(), "name", with_ascendants=True
+        )
+        for acr in df_cmp["source_from_analysis"]
     ]
     df_cmp["atlas_hierarchy"] = rows_hierarchy
     df_cmp["atlas_hierarchy_names"] = rows_hierarchy_names

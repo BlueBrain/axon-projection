@@ -1,12 +1,14 @@
 """Module to compare morphometrics of tufts and trunks of axon populations."""
 import glob
 import json
+import os
 import pathlib
 from multiprocessing import Manager
 from multiprocessing import Pool
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import neurom as nm
 import numpy as np
 import pandas as pd
@@ -15,14 +17,6 @@ from axon_synthesis.utils import get_morphology_paths
 
 from axon_projection.compute_morphometrics import compute_stats
 from axon_projection.compute_morphometrics import compute_stats_parallel
-
-
-def compare_connectivity(df_one_path, df_two_path):
-    """Check if the two dataframes are equal."""
-    df_one = pd.read_csv(df_one_path, index_col=0)
-    df_two = pd.read_csv(df_two_path, index_col=0)
-
-    print("DFs are equal : ", df_one.equals(df_two))
 
 
 def compute_normalized_score(
@@ -71,7 +65,7 @@ def compute_stats_populations(
     morph_type="tufts",
     out_file="pop_comparison_MOp5",
 ):
-    """Compares the morphometrics of morph_file with the ones of the same-class morphs."""
+    """Compute morphometrics for two populations and save the results to json."""
     dict_rows = {}
 
     pop_1 = nm.load_morphologies(pop_list_paths_1)
@@ -95,6 +89,8 @@ def compute_stats_populations(
     df_save = df.applymap(lambda x: x.tolist() if isinstance(x, np.ndarray) else x)
     print(df_save)
     df_save.to_json(out_file + "_" + morph_type + ".json")
+
+    return df
 
 
 def normalize_and_center(df):
@@ -179,7 +175,16 @@ def plot_population_scores(
     plt.savefig(data_file_name + "_score_" + morph_type + ".pdf")
 
 
-def plot_population_stats(df_1, df_2, morphometrics, morph_type="tufts"):
+def plot_population_stats(
+    df_1,
+    df_2,
+    morphometrics,
+    morph_type="tufts",
+    out_file="pop_comparison_MOp5_score",
+    feat_name="Feature value",
+    type_1="Bio",
+    type_2="Synth",
+):
     """Plot the populations morphometrics."""
     df_1 = pd.DataFrame(df_1)
     df_1 = df_1.T
@@ -191,8 +196,8 @@ def plot_population_stats(df_1, df_2, morphometrics, morph_type="tufts"):
     df_2 = df_2.melt(var_name="Morphometric", value_name="Values")
     # df_2.index.names = ['Morphometric']
     # df_2.columns.names = ['Distribution']
-    df_1["Type"] = "Bio"
-    df_2["Type"] = "Synth"
+    df_1["Type"] = type_1
+    df_2["Type"] = type_2
     # combine df_1 and df_2 into a single dataframe for plotting
 
     combined_df = pd.concat([df_1, df_2])
@@ -208,8 +213,9 @@ def plot_population_stats(df_1, df_2, morphometrics, morph_type="tufts"):
     # df_normalized = normalize_and_center(df_expanded)
     df_normalized = df_expanded
     print(df_normalized)
-
+    set_font_size()
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
     ax.spines["bottom"].set_visible(False)
@@ -221,9 +227,9 @@ def plot_population_stats(df_1, df_2, morphometrics, morph_type="tufts"):
 
         # Define RGBA color for 'tab:blue' with alpha = 0.5
         tab_blue_rgb = mcolors.to_rgb("tab:blue")
-        tab_red_rgb = mcolors.to_rgb("tab:red")
+        tab_red_rgb = mcolors.to_rgb("tab:green")
         # Define the color palette
-        palette = {"Bio": tab_blue_rgb, "Synth": tab_red_rgb}
+        palette = {type_1: tab_blue_rgb, type_2: tab_red_rgb}
         # ax = sns.boxplot(
         #     x="Morphometric",
         #     y="Values",
@@ -232,37 +238,37 @@ def plot_population_stats(df_1, df_2, morphometrics, morph_type="tufts"):
         #     palette=palette,
         #     log_scale=False,
         # )
-        ax = sns.violinplot(
-            x="Morphometric",
-            y="Values",
+        # ax = sns.violinplot(
+        #     x="Morphometric",
+        #     y="Values",
+        #     hue="Type",
+        #     data=df_filtered,
+        #     split=True,
+        #     inner="quartile",
+        #     palette=palette,
+        #     log_scale=False,
+        # )
+        ax = sns.histplot(
+            x="Values",
             hue="Type",
             data=df_filtered,
-            split=True,
-            inner="quartile",
+            kde=True,
             palette=palette,
             log_scale=False,
+            stat="percent",
+            common_norm=False,
+            bins=100,
         )
-    ax.set_ylabel("Normalized features values")
+    ax.set_xlabel(feat_name)
     x_labels = []
     for morph_feature in morphometrics:
         x_labels.append(morph_feature.replace("_", " "))
-    ax.set_xticklabels(x_labels, rotation=90)
+    # ax.set_xticklabels(x_labels, rotation=90)
     # hide the legend
     # ax.get_legend().remove()
-    plt.savefig("pop_comparison_MOp5_score_" + morph_type + ".pdf")
-
-
-def make_plots(list_morphs_bio, list_morphs_synth, morphometrics, morph_type="tufts"):
-    """Make plots for the given morphometrics."""
-    # for re-running the neurom features computation
-    recompute = False
-    compute_stats_populations(
-        list_morphs_bio,
-        list_morphs_synth,
-        morphometrics,
-        morph_type=morph_type,
-        recompute=recompute,
-    )
+    ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useMathText=True))
+    ax.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
+    plt.savefig(out_file + "_" + morph_type + "_perc.pdf")
 
 
 def make_plots_score(
@@ -303,6 +309,17 @@ def make_plots_score(
     )
 
 
+def set_font_size(font_size=18):
+    """Set the font size of everything on a matplotlib plot."""
+    plt.rc("font", size=font_size)
+    plt.rc("axes", titlesize=font_size)
+    plt.rc("axes", labelsize=font_size + 2)
+    plt.rc("xtick", labelsize=font_size)
+    plt.rc("ytick", labelsize=font_size)
+    plt.rc("legend", fontsize=font_size)
+    plt.rc("figure", titlesize=font_size + 3)
+
+
 if __name__ == "__main__":
     # morphometrics = ["section_lengths", "remote_bifurcation_angles",
     # "number_of_sections_per_neurite", "terminal_path_lengths",
@@ -321,12 +338,28 @@ if __name__ == "__main__":
         "remote_bifurcation_angles",
     ]
 
-    bio_AP_path = "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
-    "axon_projection/out_a_p_12_obp_atlas/"
-    a_s_out_path = "/gpfs/bbp.cscs.ch/project/proj135/home/petkantc/axon/axonal-projection/"
-    "axon_projection/validation/circuit-build/lite_MOp5_only/a_s_out/"
+    bio_AP_path = (
+        "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
+        "axon_projection/out_a_p_final/"
+    )
+    a_s_out_path = (
+        "/gpfs/bbp.cscs.ch/project/proj135/home/petkantc/axon/axonal-projection/"
+        "axon_projection/validation/circuit-build/lite_MOp5_final/a_s_out/"
+    )
+    synth_AP_path = (
+        "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/"
+        "axonal-projection/axon_projection/out_synth_MOp5_final/axon_lengths_12.csv"
+    )
     # Optionally filter the morphs based on the source
     source = "MOp5"
+    # since the same number of cells are synthesized in both hemispheres,
+    # we need to ensure we have the same proportions of axons as in the biological data
+    # to compare correctly the morphometrics
+    L_bio = 46
+    R_bio = 19
+    L_synth = 877
+    R_synth = 828
+    R_synth_target = int(L_synth * R_bio / L_bio)
     # plt.rcParams.update({"font.size": 18})
     normal_size = 20
     plt.rc("font", size=normal_size)
@@ -376,21 +409,66 @@ if __name__ == "__main__":
     with open("bio_trunks_morphs_list.txt", "r") as f:
         bio_trunks_morphs_list = f.read().splitlines()
 
+    # read axon_proj synth df
+    axons_proj_synth_df = pd.read_csv(synth_AP_path, index_col=0)
+    print(axons_proj_synth_df)
+    axons_proj_synth_df = axons_proj_synth_df[["morph_path", "source"]]
+    print(axons_proj_synth_df)
+    axons_proj_synth_df["morph_name"] = axons_proj_synth_df["morph_path"].apply(
+        lambda x: os.path.splitext(os.path.basename(x))[0]
+    )
+    axons_proj_synth_df = axons_proj_synth_df[axons_proj_synth_df["source"].str.contains(source)]
+    # filter to keep only R_synth_target cells from the right hemisphere
+    if R_synth_target > 0:
+        axons_proj_filt_df = axons_proj_synth_df[axons_proj_synth_df["source"] == source + "_R"]
+        axons_proj_filt_df = axons_proj_filt_df.sample(n=R_synth_target, random_state=42)
+        print("Keeping only {} cells from the right hemisphere".format(R_synth_target))
+        axons_proj_synth_df = axons_proj_synth_df[axons_proj_synth_df["source"] != source + "_R"]
+        axons_proj_synth_df = pd.concat([axons_proj_synth_df, axons_proj_filt_df]).reset_index(
+            drop=True
+        )
+    list_morphs_to_keep = axons_proj_synth_df["morph_name"].values.tolist()
+    print("list_morphs_to_keep : ", list_morphs_to_keep)
     # SYNTH tufts paths
     synth_tufts_paths = a_s_out_path + "TuftMorphologies"
-    synth_tufts_morphs_list = get_morphology_paths(synth_tufts_paths)["morph_path"].values.tolist()
+    synth_tufts_morphs_list_pre = get_morphology_paths(synth_tufts_paths)[
+        "morph_path"
+    ].values.tolist()
+    print(os.path.basename(synth_tufts_morphs_list_pre[0]))
+    # keep only the tufts of the morph_path which basename starts with any of the list_to_keep
+    synth_tufts_morphs_list = [
+        m
+        for m in synth_tufts_morphs_list_pre
+        if any(
+            str(os.path.basename(m)).startswith(morph_name) for morph_name in list_morphs_to_keep
+        )
+    ]
     # SYNTH trunks paths
     synth_trunks_paths = a_s_out_path + "PostProcessTrunkMorphologies"
-    synth_trunks_morphs_list = get_morphology_paths(synth_trunks_paths)[
+    synth_trunks_morphs_list_pre = get_morphology_paths(synth_trunks_paths)[
         "morph_path"
     ].values.tolist()
+    synth_trunks_morphs_list = [
+        m
+        for m in synth_trunks_morphs_list_pre
+        if any(
+            str(os.path.basename(m)).startswith(morph_name) for morph_name in list_morphs_to_keep
+        )
+    ]
     # SYNTH pre-processed trunks paths
     synth_main_trunks_paths = a_s_out_path + "MainTrunkMorphologies"
-    synth_main_trunks_morphs_list = get_morphology_paths(synth_main_trunks_paths)[
+    synth_main_trunks_morphs_list_pre = get_morphology_paths(synth_main_trunks_paths)[
         "morph_path"
     ].values.tolist()
+    synth_main_trunks_morphs_list = [
+        m
+        for m in synth_main_trunks_morphs_list_pre
+        if any(
+            str(os.path.basename(m)).startswith(morph_name) for morph_name in list_morphs_to_keep
+        )
+    ]
 
-    data_file_name = "pop_morphometrics_MOp5_rc_1"
+    data_file_name = "pop_morphometrics_MOp5"
 
     compute_stats_populations(
         bio_tufts_morphs_list,

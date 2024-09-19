@@ -27,7 +27,7 @@ salloc \
         --constraint=cpu \
         --account=proj135 \
         --exclusive \
-        --time=4:00:00 \
+        --time=10:00:00 \
         -n200 \
         --cpus-per-task=1 \
         --mem=0 \
@@ -51,14 +51,14 @@ salloc \
                 --outputs-disable-graph-creation-figures \
                 --outputs-disable-graph-creation-data \
                 --outputs-disable-main-trunk-figures \
-                --outputs-enable-main-trunk-morphologies \
+                --outputs-disable-main-trunk-morphologies \
                 --outputs-disable-postprocess-trunk-figures \
-                --outputs-enable-postprocess-trunk-morphologies \
+                --outputs-disable-postprocess-trunk-morphologies \
                 --outputs-disable-steiner-tree-solutions \
                 --outputs-disable-target-point-figures \
                 --outputs-disable-target-points \
                 --outputs-disable-tuft-figures \
-                --outputs-enable-tuft-morphologies \
+                --outputs-disable-tuft-morphologies \
                 --use-mpi \
 # 2>&1 | tee -a ${LOG_FILE}; \
 echo "Results exported to ${OUTPUT_DIR}"; \

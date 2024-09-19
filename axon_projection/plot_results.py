@@ -481,6 +481,7 @@ def compare_feat_in_regions(
     out_path="./",
     atlas_hierarchy="/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/"
     "atlas_aleksandra/atlas-release-mouse-barrels-density-mod/hierarchy.json",
+    dict_filter_morphs=None,
 ):
     """Compares the lengths in region between bio and synth axons."""
     os.makedirs(out_path, exist_ok=True)
@@ -493,6 +494,20 @@ def compare_feat_in_regions(
     # filter on just the source region of interest
     bio_feat_df = bio_feat_df[bio_feat_df["source"].apply(without_hemisphere) == source]
     synth_feat_df = synth_feat_df[synth_feat_df["source"].apply(without_hemisphere) == source]
+    # dict that contains how much morphs to keep for each hemisphere
+    if dict_filter_morphs is not None:
+        for hemi in dict_filter_morphs.keys():
+            n_morphs_to_keep = dict_filter_morphs[hemi]
+            # sample n_morphs_to_keep morphs from this hemisphere from the dataframe
+            # and keep the rest as is
+            if n_morphs_to_keep > 0:
+                synth_feat_filt_df = synth_feat_df[synth_feat_df["source"] == source + "_" + hemi]
+                synth_feat_filt_df = synth_feat_filt_df.sample(n=n_morphs_to_keep, random_state=42)
+                print("Keeping only", len(synth_feat_filt_df), "morphs from", source + "_" + hemi)
+                synth_feat_df = synth_feat_df[synth_feat_df["source"] != source + "_" + hemi]
+                synth_feat_df = pd.concat([synth_feat_df, synth_feat_filt_df]).reset_index(
+                    drop=True
+                )
 
     num_morphs_bio = len(bio_feat_df)
     num_morphs_synth = len(synth_feat_df)
@@ -1135,7 +1150,7 @@ def compare_lengths_vs_connectivity(
     # Recreate the scatter plot
     ax.scatter(df["bio_lengths"], df["synth_conns"], s=20)
     for i, key in enumerate(df.index):
-        ax.annotate(key, (df["bio_lengths"][i], df["synth_conns"][i]))
+        ax.annotate(key, (df["bio_lengths"][i], df["synth_conns"][i]), fontsize=14)
     ax.set_yscale("log")
     ax.set_xscale("log")
     # Plot the regression line on log-log scale
@@ -1293,7 +1308,7 @@ def plot_chord_diagram(
     df_axons = df_axons.rename(columns={"0": "connectivity_count"})
     df_axons = df_axons[df_axons["connectivity_count"] > 0]
     # unique_regions = pd.concat([df_no_axons, df_axons])["parent_region_pre"].unique()
-    # have them in that order
+    # have them in that order for the paper
     regions_for_color_isocortex = [
         "ACA",
         "FRP",
@@ -1311,6 +1326,9 @@ def plot_chord_diagram(
         "ECT",
         "PERI",
         "GU",
+        "PTLp",
+        "VIS",
+        "AI",
     ]
     # unique_regions = list(set(unique_regions) | set(target_regions))
     # define a consistent color map across plots
@@ -1425,7 +1443,7 @@ def plot_hemispheres(
         lambda x: find_parent_acronym(x, parent_mapping, regions_subset)
     )
     # count the number of rows without a parent_region per hemisphere
-    print(tuft_counts_bio_df[tuft_counts_bio_df["parent_region"].isna()])
+    # print(tuft_counts_bio_df[tuft_counts_bio_df["parent_region"].isna()])
     tuft_counts_bio_df.loc[tuft_counts_bio_df["parent_region"].isna(), "parent_region"] = "Other"
     # drop the rows if their parent_region is na
     # tuft_counts_bio_df = tuft_counts_bio_df.dropna(subset=["parent_region"])

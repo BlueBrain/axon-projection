@@ -18,7 +18,7 @@ from morphio.mut import Morphology as morphio_morph
 # from neurom import load_morphology
 from voxcell.cell_collection import CellCollection
 
-from axon_projection.axonal_projection import get_soma_pos
+from axon_projection.axonal_projections import get_soma_pos
 from axon_projection.choose_hierarchy_level import build_parent_mapping
 from axon_projection.choose_hierarchy_level import find_parent_acronym
 from axon_projection.query_atlas import get_hemisphere
@@ -279,8 +279,8 @@ def add_cells_to_collection(collection, morphs_list, morphs_out_path):
         x = soma_pos[0]
         y = soma_pos[1]
         z = soma_pos[2]
-        # translate(morph, -soma_pos)
-        # convert(morph, os.path.join(morphs_out_path, morph_name)+'.asc', nrn_order=True)
+        translate(morph, -soma_pos)
+        convert(morph, os.path.join(morphs_out_path, morph_name) + ".asc", nrn_order=True)
         orientation = np.eye(3)
         rows_list.append(
             [
@@ -311,8 +311,10 @@ def add_cells_to_collection(collection, morphs_list, morphs_out_path):
     coll_to_delete_df.index += 1
     coll_to_delete = CellCollection.from_dataframe(coll_to_delete_df)
     coll_to_delete.population_name = morphs_collection.population_name
-    hashed_path = "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
-    "axon_projection/validation/circuit-build/lite_iso_bio_axons/morphologies/neurons"
+    hashed_path = (
+        "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
+        "axon_projection/validation/circuit-build/lite_iso_bio_axons/morphologies/neurons"
+    )
     delete_morphs(coll_to_delete, hashed_path, hashed_path, as_collection=True)
 
     # then remove them from the collection
@@ -356,6 +358,52 @@ def add_cells_to_collection(collection, morphs_list, morphs_out_path):
     out_coll_path = os.path.join(os.path.dirname(collection), "circuit.synthesized_morphologies.h5")
     morphs_collection_final.save(out_coll_path)
     print(f"Done adding {len(new_cells_df)} cells to {collection}, saved to {morphs_out_path}")
+
+
+def delete_some_morphs_from_coll(collection, hashed_path, num_morphs_to_delete, hemi="R"):
+    """Delete some morphologies from the collection."""
+    morphs_collection = CellCollection.load(collection)
+    morphs_coll_df = morphs_collection.as_dataframe()
+    print("Initial number of cells : ", len(morphs_coll_df))
+    atlas, brain_regions, regions_map = load_atlas(
+        "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/atlas_aleksandra/"
+        "atlas-release-mouse-barrels-density-mod",
+        "brain_regions",
+        "hierarchy.json",
+    )
+    # get the hemisphere of the cells
+    morphs_coll_df["cell_hemisphere"] = morphs_coll_df.apply(
+        lambda row: get_hemisphere([row["x"], row["y"], row["z"]], brain_regions.bbox), axis=1
+    )
+    morphs_coll_df_filt = morphs_coll_df[
+        (morphs_coll_df["mtype"].str.contains("PC"))
+        & (morphs_coll_df["subregion"] == "MOp5")
+        & (morphs_coll_df["cell_hemisphere"] == hemi)
+    ]
+    print(
+        "Found ",
+        len(morphs_coll_df_filt),
+        " cells with mtype PC in subregion 'MOp5' and hemisphere ",
+        hemi,
+    )
+    morphs_to_delete = morphs_coll_df_filt.sample(num_morphs_to_delete)
+    print(
+        "Dropping ",
+        len(morphs_to_delete),
+        " cells with mtype PC in subregion 'MOp5' and hemisphere ",
+        hemi,
+    )
+    # subtract the two dataframes
+    morphs_coll_df = morphs_coll_df[~morphs_coll_df.index.isin(morphs_to_delete.index)]
+    print("Remaining ", len(morphs_coll_df), " cells")
+    morphs_coll_df.reset_index(drop=True, inplace=True)
+    morphs_coll_df.index += 1
+    morphs_coll_final = CellCollection.from_dataframe(morphs_coll_df)
+    morphs_coll_final.population_name = morphs_collection.population_name
+    # delete_morphs(morphs_to_delete_coll, hashed_path, hashed_path, as_collection=True)
+    morphs_coll_final.save(
+        os.path.join(os.path.dirname(collection), "circuit.synthesized_morphologies.h5")
+    )
 
 
 if __name__ == "__main__":
@@ -437,8 +485,7 @@ if __name__ == "__main__":
     elif which_task == "ac":
         # add bio cells
         list_morphs_to_add = get_morphology_paths(
-            "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
-            "axon_projection/validation/circuit-build/lite_iso_bio_axons/MOp5"
+            "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/morpho/MOp5_final"
         )["morph_path"].values.tolist()
         add_cells_to_collection(
             sim_folder + "/auxiliary/circuit.synthesized_morphologies_no_bio.h5",
@@ -446,6 +493,20 @@ if __name__ == "__main__":
             "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
             "axon_projection/validation/circuit-build/lite_iso_bio_axons/"
             "morphologies/neurons/MOp5/",
+        )
+    elif which_task == "ds":
+        # delete some morphs from collection
+        L_bio = 46
+        R_bio = 19
+        L_synth = 877
+        R_synth = 828
+        R_synth_target = int(L_synth * R_bio / L_bio)
+        num_morphs_to_delete = R_synth - R_synth_target
+        delete_some_morphs_from_coll(
+            sim_folder + "/auxiliary/circuit.synthesized_morphologies_original.h5",
+            all_morphs_path,
+            num_morphs_to_delete,
+            hemi="R",
         )
     else:
         print("Invalid task options, got ", which_task)

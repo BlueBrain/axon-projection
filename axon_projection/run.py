@@ -3,8 +3,6 @@ import configparser
 import logging
 import sys
 import time
-
-# from ast import literal_eval
 from os import makedirs
 from os import popen
 
@@ -20,6 +18,8 @@ from axon_projection.sample_axon import main as sample_axon
 from axon_projection.separate_tufts import compute_clustered_tufts_scores
 from axon_projection.separate_tufts import compute_morph_properties
 from axon_projection.visualize_connections import create_conn_graphs
+
+# from axon_synthesis.utils import ParallelConfig
 
 
 def full_workflow(config):
@@ -57,12 +57,14 @@ def full_workflow(config):
             config.has_option("separate_tufts", "cluster_tufts")
             and config["separate_tufts"]["cluster_tufts"] == "True"
         ):
+            # parallel_cfg = ParallelConfig(nb_processes=200, use_mpi=False)
             # debug = True is necessary to create the tufts file
             create_inputs(
                 config["morphologies"]["path"],
                 config["output"]["path"],
                 tufts_clustering_params,
                 debug=True,
+                # parallel_config=parallel_cfg,
             )
         # and compute representativity scores of the tufts
         compute_clustered_tufts_scores(config)

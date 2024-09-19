@@ -43,8 +43,7 @@ def plot_flat_morph(morph_path, axon_color):
     """Plots the flatmap of the given morph."""
     morph_name = os.path.basename(morph_path).split(".")[0]
     os.system(
-        "python /gpfs/bbp.cscs.ch/project/proj135/home/petkantc/axon/"
-        "axonal-projection/axon_projection/validation/plot_flatmap_h5/flatplot.py "
+        "python flatplot.py "
         f"--dots --h5morpho axon --color '{axons_color}' -p 512 "
         f"--dual flatmap_both.nrrd {morph_path} {morph_name}"
     )
@@ -131,10 +130,14 @@ if __name__ == "__main__":
         print("Usage <bio|synth> <n_max_morphs_to_plot>")
         exit(1)
 
-    bio_morph_dir = "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
-    "axon_projection/out_a_p_12_obp_atlas/axon_lengths_12.csv"
-    synth_morph_dir = "/gpfs/bbp.cscs.ch/project/proj135/home/petkantc/axon/axonal-projection/"
-    "axon_projection/validation/circuit-build/lite_MOp5_new_atlas/a_s_out/Morphologies/non_centered"
+    bio_morph_dir = (
+        "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
+        "axon_projection/out_a_p_final/axon_lengths_12.csv"
+    )
+    synth_morph_dir = (
+        "/gpfs/bbp.cscs.ch/project/proj135/home/petkantc/axon/axonal-projection/"
+        "axon_projection/validation/circuit-build/lite_MOp5_final/a_s_out/Morphologies/non_centered"
+    )
     # morph_dir = sys.argv[1]
     is_bio = sys.argv[1] == "bio"
     is_synth = sys.argv[1] == "synth"
@@ -181,6 +184,6 @@ if __name__ == "__main__":
     for morph_path, _ in args_list_tot:
         overlay_morph(morph_path)
 
-    os.system(f"mv temp.png axons_{sys.argv[2]}_n{n_morphs_to_plot}.png")
+    os.system(f"mv temp.png axons_{sys.argv[1]}_n{n_morphs_to_plot}_final.png")
 
     delete_temp_files(list_morphs)

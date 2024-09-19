@@ -27,6 +27,19 @@ def get_axons(morph):
     return axons_list
 
 
+def has_neurite_type(morph_path, neurite_type):
+    """Checks if morphology has a neurite of type neurite_type."""
+    morph = nm.load_morphology(morph_path)
+    try:
+        axons_list = [i for i in morph.neurites if i.type == neurite_type]
+    except Exception as e:  # pylint: disable=broad-except
+        logging.debug("Found several neurite types [%s]", repr(e))
+        for i in morph.neurites:
+            logging.debug("%s : data type %s", i.subtree_types, type(i.subtree_types))
+        axons_list = [i for i in morph.neurites if neurite_type in i.subtree_types]
+    return len(axons_list) > 0
+
+
 def compute_stat(which_feature, pop, n_type, res_queue):
     """Computes a NeuroM feature on the given population, and stores the result in a queue."""
     val = np.array(nm.get(which_feature, pop, neurite_type=n_type))

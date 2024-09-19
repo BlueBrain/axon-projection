@@ -308,7 +308,7 @@ def load_clustering_conn(
     return dict_probs
 
 
-def compute_out_degree(conn_mat_path, region_to_plot, is_bio=False, vs_bio=False):
+def compute_out_degree(conn_mat_path, region_to_plot, is_bio=False, with_axons=False):
     """Compute the out degree of all layer 5 pyramidal cells in the region to plot."""
     print("Computing out degree for matrix from: ", conn_mat_path)
     M = load_conn_mat(conn_mat_path)
@@ -331,9 +331,8 @@ def compute_out_degree(conn_mat_path, region_to_plot, is_bio=False, vs_bio=False
     M_filtered = M.filter(prop_name="source_mtype", side="pre").isin(PCs_mtypes)
     print(M_filtered.edges["source_region"].unique())
     M_filtered = M_filtered.filter(prop_name="source_region", side="pre").eq(region_to_plot)
-    print("Here ", M_filtered.edges)
-    if vs_bio:
-        # M_MOp5_targets = M_filtered.filter(prop_name="source_region", side="post").eq('MOp5')
+    # save the connectivity matrix for the chord plot
+    if with_axons:
         save_conn_mat(M_filtered, f"{conn_mat_path}_MOp5_PCs_isBio_{is_bio}")
 
     # print("Neighborhood: ", M.neighborhood.array[0])
@@ -354,15 +353,14 @@ def compute_out_degree(conn_mat_path, region_to_plot, is_bio=False, vs_bio=False
 
 
 def plot_out_degree(
-    conn_mat_path, conn_mat_wo_axons_path, vs_bio=False, region_to_plot="MOp5", out_dir="."
+    conn_mat_path, conn_mat_wo_axons_path, conn_mat_bio=None, region_to_plot="MOp5", out_dir="."
 ):
     """Plot the out degree distribution of the two matrices."""
     num_conns_flat_with_axons = compute_out_degree(
-        conn_mat_path, region_to_plot, is_bio=False, vs_bio=vs_bio
+        conn_mat_path, region_to_plot, is_bio=False, with_axons=True
     )
-    # This one can be bio or without axons
     num_conns_flat_wo_axons = compute_out_degree(
-        conn_mat_wo_axons_path, region_to_plot, is_bio=vs_bio, vs_bio=vs_bio
+        conn_mat_wo_axons_path, region_to_plot, is_bio=False
     )
     # plot the distribution of number of connections
     fig, ax = plt.subplots(figsize=(5, 5))
@@ -370,9 +368,13 @@ def plot_out_degree(
         num_conns_flat_with_axons, bins=100, kde=True, color="tab:red", ax=ax, stat="count"
     )
     cmp_color = "tab:green"
-    if vs_bio:
-        cmp_color = "tab:blue"
     sns.histplot(num_conns_flat_wo_axons, bins=100, kde=True, color=cmp_color, ax=ax, stat="count")
+
+    if conn_mat_bio is not None:
+        num_conns_bio = compute_out_degree(
+            conn_mat_bio, region_to_plot, is_bio=True, with_axons=True
+        )
+        sns.histplot(num_conns_bio, bins=100, kde=True, color="tab:blue", ax=ax, stat="count")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.set_xlabel("Number of connections")
@@ -380,7 +382,7 @@ def plot_out_degree(
     # set the title
     ax.set_title("Distribution of out-degree")
     set_font_size()
-    fig.savefig(out_dir + "/connection_distr_vs_bio_" + str(vs_bio) + ".pdf")
+    fig.savefig(out_dir + "/connection_distr.pdf")
     print("Saving distribution in ", out_dir + "/connection_distr.pdf")
 
     # plot also a normalized version to compare the distributions shape
@@ -401,12 +403,21 @@ def plot_out_degree(
         ax=ax,
         stat="density",
     )
+    if conn_mat_bio is not None:
+        sns.histplot(
+            num_conns_bio / np.max(num_conns_bio),
+            bins=100,
+            kde=True,
+            color="tab:blue",
+            ax=ax,
+            stat="density",
+        )
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.set_xlabel("Normalized number of connections")
     ax.set_ylabel("Density of neurons")
     set_font_size(12)
-    fig.savefig(out_dir + "/connection_distr_norm_vs_bio_" + str(vs_bio) + ".pdf")
+    fig.savefig(out_dir + "/connection_distr_norm.pdf")
 
 
 if __name__ == "__main__":
@@ -434,22 +445,33 @@ if __name__ == "__main__":
     sim_dir = sys.argv[1]
     region_to_plot = sys.argv[2]
     hierarchy_level = "12"
-    clustering_dir_ = "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/"
-    "axonal-projection/axon_projection/out_a_p_12_obp_atlas"
-    clustering_dir_synth_ = "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/"
-    "axonal-projection/axon_projection/out_synth_MOp5_obp_atlas"
-    no_axons_dir = "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
-    "axon_projection/validation/circuit-build/lite_iso_no_axons_new_atlas"
-    bio_axons_dir = "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
-    "axon_projection/validation/circuit-build/lite_iso_bio_axons"
-    atlas_path = "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/atlas_aleksandra/"
-    "atlas-release-mouse-barrels-density-mod"
+    clustering_dir_ = (
+        "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/"
+        "axonal-projection/axon_projection/out_a_p_final"
+    )
+    clustering_dir_synth_ = (
+        "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/"
+        "axonal-projection/axon_projection/out_synth_MOp5_final"
+    )
+    no_axons_dir = (
+        "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
+        "axon_projection/validation/circuit-build/lite_iso_no_axons_new_atlas"
+    )
+    bio_axons_dir = (
+        "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
+        "axon_projection/validation/circuit-build/lite_iso_bio_axons"
+    )
+    atlas_path = (
+        "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/atlas_aleksandra/"
+        "atlas-release-mouse-barrels-density-mod"
+    )
     targets_isocortex = [
         "MOp",
         "MOs",
         "SSp",
         "SSs",
         "VISC",
+        "VIS",
         "AUD",
         "PERI",
         "ECT",
@@ -461,6 +483,8 @@ if __name__ == "__main__":
         "PL",
         "ILA",
         "TEa",
+        "PTLp",
+        "AI",
     ]
 
     whichWorkflow = "struct_"
@@ -484,16 +508,9 @@ if __name__ == "__main__":
     M = create_conn_mat(circ_fn, loader_config)
     save_conn_mat(M, out_dir + "/conn_mat_" + whichWorkflow.replace("_", ""))
 
-    M = load_conn_mat(out_dir + "/conn_mat_" + whichWorkflow.replace("_", ""))
+    # M = load_conn_mat(out_dir + "/conn_mat_" + whichWorkflow.replace("_", ""))
 
     analyze_connectome(M, out_dir)
-    plot_connectivity(
-        out_dir + "/connection_counts_for_pathways.csv",
-        region_to_plot,
-        clustering_dir=clustering_dir_,
-        output_dir=out_dir,
-        local=False,
-    )
     compare_lengths_vs_connectivity(
         clustering_dir_synth_ + "/axon_lengths_" + str(hierarchy_level) + ".csv",
         sim_dir + "/connection_counts_for_pathways.csv",
@@ -504,7 +521,7 @@ if __name__ == "__main__":
     compare_connectivity(
         no_axons_dir + "/connection_counts_for_pathways.csv",
         sim_dir + "/connection_counts_for_pathways.csv",
-        bio_axons_dir + "/connection_counts_for_pathways.csv",
+        None,  # bio_axons_dir + "/connection_counts_for_pathways.csv",
         target_regions=targets_isocortex,
     )
     plot_out_degree(
@@ -516,8 +533,7 @@ if __name__ == "__main__":
 
     # chord diagram
     bio_pathways_df = pandas.read_csv(
-        "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/axon/axonal-projection/"
-        "axon_projection/out_a_p_12_obp_atlas/conn_probs.csv",
+        clustering_dir_ + "/conn_probs.csv",
         index_col=0,
     )
     bio_sources = bio_pathways_df["source"].apply(without_hemisphere).unique().tolist()
@@ -545,23 +561,25 @@ if __name__ == "__main__":
     )
 
     # bio vs synth long range
+    # this step creates the connectivity matrices
     plot_out_degree(
         sim_dir + "/conn_mat_" + whichWorkflow.replace("_", ""),
+        no_axons_dir + "/conn_mat_" + whichWorkflow.replace("_", ""),
         bio_axons_dir + "/conn_mat_" + whichWorkflow.replace("_", ""),
         region_to_plot=region_to_plot,
         out_dir=out_dir,
-        vs_bio=True,
     )
-    # Do that only once
     M = load_conn_mat(
         out_dir + "/conn_mat_" + whichWorkflow.replace("_", "") + "_MOp5_PCs_isBio_False"
     )
-    analyze_connectome(M, out_dir, vs_bio=True)
+    # Do that only once
+    # analyze_connectome(M, out_dir, vs_bio=True)
     M_bio = load_conn_mat(
         bio_axons_dir + "/conn_mat_" + whichWorkflow.replace("_", "") + "_MOp5_PCs_isBio_True"
     )
-    analyze_connectome(M_bio, bio_axons_dir, vs_bio=True)
-    #
+    # Do that only once
+    # analyze_connectome(M_bio, bio_axons_dir, vs_bio=True)
+
     plot_chord_diagram(
         bio_axons_dir + "/connection_counts_for_pathways_vs_bio.csv",
         sim_dir + "/connection_counts_for_pathways_vs_bio.csv",
