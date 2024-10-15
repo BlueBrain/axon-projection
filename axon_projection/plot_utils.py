@@ -59,6 +59,7 @@ def plot_html(
     logging.debug("Exported figure to %s", output_path)
 
 
+# pylint: disable=too-many-positional-arguments
 def plot_tuft(morph, tuft_morph, group, group_name, cluster_df, output_path):
     """Plot tuft and morph to a HTML figure."""
     plotted_morph = Morphology(

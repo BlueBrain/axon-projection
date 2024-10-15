@@ -471,7 +471,8 @@ def set_font_size(font_size=18):
     plt.rc("figure", titlesize=font_size + 3)
 
 
-# pylint: disable=too-many-statements, dangerous-default-value, too-many-locals
+# pylint: disable=too-many-statements, dangerous-default-value, too-many-local
+# pylint: disable=too-many-positional-arguments
 def compare_feat_in_regions(
     df_bio_path,
     df_synth_path,
@@ -770,6 +771,7 @@ def compare_feat_in_regions(
     plt.close()
 
 
+# pylint: disable=too-many-positional-arguments
 def compare_tuft_nb_in_regions(
     df_bio_path,
     df_synth_path,
@@ -1164,7 +1166,7 @@ def compare_lengths_vs_connectivity(
     fig.savefig(os.path.split(df_synth_path)[0] + "/lengths_vs_connectivity_scatter_log.pdf")
 
 
-# pylint: disable=dangerous-default-value
+# pylint: disable=dangerous-default-value, too-many-positional-arguments
 def compare_connectivity(
     df_no_axons_path,
     df_axons_path,
@@ -1266,6 +1268,7 @@ def compare_connectivity(
     fig.savefig(os.path.split(df_axons_path)[0] + "/connectivity_local_vs_long.pdf")
 
 
+# pylint: disable=too-many-positional-arguments
 def plot_chord_diagram(
     df_no_axons_path,
     df_axons_path,
@@ -1395,6 +1398,7 @@ def plot_chord_diagram(
     )
 
 
+# pylint: disable=too-many-positional-arguments
 def plot_hemispheres(
     df_bio_path,
     df_synth_path,

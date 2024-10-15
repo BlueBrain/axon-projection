@@ -85,7 +85,7 @@ def create_tuft_morphology(morph, tuft_nodes_ids, common_ancestor, common_path_,
     return tuft_morph, tuft_ancestor
 
 
-# pylint: disable=too-many-arguments, protected-access
+# pylint: disable=too-many-arguments, protected-access, too-many-positional-arguments
 def separate_tuft(
     res_queue,
     class_assignment,
@@ -548,7 +548,7 @@ def trunk_path(graph, ancestor_nodes, source=None, shortest_paths=None):
     return trunk_path_
 
 
-# pylint: disable=protected-access
+# pylint: disable=protected-access, too-many-positional-arguments
 def separate_trunk(
     res_queue,
     axon_id,

@@ -19,8 +19,8 @@ def compare_axonal_projections(config):
     # remove all the '_O' suffixes from the columns headers
     df_1.columns = df_1.columns.str.replace("_O", "")
     df_2.columns = df_2.columns.str.replace("_O", "")
-    df_1["name"] = df_1["morph_path"].apply(lambda x: os.path.basename(x))
-    df_2["name"] = df_2["morph_path"].apply(lambda x: os.path.basename(x))
+    df_1["name"] = df_1["morph_path"].apply(os.path.basename)
+    df_2["name"] = df_2["morph_path"].apply(os.path.basename)
 
     logging.warning("Column headers of df_1: %s", df_1.columns)
     logging.warning("Column headers of df_2: %s", df_2.columns)

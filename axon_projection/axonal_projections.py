@@ -46,6 +46,7 @@ def get_soma_pos(morph):
     return soma_pos
 
 
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def find_and_register_source_region(
     morph, region_names, brain_regions, region_map, hierarchy_level, hierarchy_file
 ):
@@ -130,7 +131,7 @@ def compute_length_in_regions(
     return lengths
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def process_morphology(
     morph_file,
     region_names,
@@ -301,7 +302,7 @@ def process_morphology(
     return
 
 
-# pylint: disable=too-many-locals,too-many-statements,too-many-branches
+# pylint: disable=too-many-positional-arguments,too-many-statements,too-many-branches
 def create_ap_table(
     morph_dir, atlas_path, atlas_regions, atlas_hierarchy, hierarchy_level, output_path
 ):

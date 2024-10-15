@@ -97,7 +97,7 @@ def morph_exists(morph_path):
     return True
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def compute_stats_cv(
     morph_file,
     list_other_morphs,
