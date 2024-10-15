@@ -3,6 +3,8 @@ import configparser
 import logging
 import os.path
 import sys
+from multiprocessing import Manager
+from multiprocessing import Pool
 from multiprocessing import Process
 from multiprocessing import Queue
 
@@ -60,21 +62,19 @@ def compute_stats(morphometrics, pop, neurite_type=nm.AXON):
 
 def compute_stats_parallel(morphometrics, pop, neurite_type=nm.AXON):
     """Computes all morphometrics on the pop in parallel, and returns the results as a dict."""
-    processes_launched = []
-    res_queue = Queue()
-    # launch the processes
-    for stat in morphometrics:
-        processes_launched.append(
-            Process(target=compute_stat, args=(stat, pop, neurite_type, res_queue))
-        )
-        processes_launched[-1].start()
-
-    # get the results
     res_dict = {}
-    num_processes = len(processes_launched)
-    for _ in range(num_processes):
-        res_dict.update(res_queue.get())
-
+    with Manager() as manager:
+        res_queue = manager.Queue()
+        with Pool() as pool:
+            args_list = []
+            # launch the processes
+            for stat in morphometrics:
+                args_list.append((stat, pop, neurite_type, res_queue))
+            pool.starmap(compute_stat, args_list)
+        print("Computing morphometrics...")
+        # get the results
+        while not res_queue.empty():
+            res_dict.update(res_queue.get())
     return res_dict
 
 

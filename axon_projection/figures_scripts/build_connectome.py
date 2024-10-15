@@ -3,9 +3,10 @@ import re
 import sys
 
 import bluepysnap as snap
+import matplotlib.colors as mcolors
 import numpy
 import numpy as np
-import pandas
+import pandas as pd
 import seaborn as sns
 from conntility import ConnectivityMatrix
 from matplotlib import pyplot as plt
@@ -174,7 +175,7 @@ def plot_connectivity(
     )
 
     # load the connectivity computed on the circuit
-    df_connectivity_pathways = pandas.read_csv(connectivity_file)
+    df_connectivity_pathways = pd.read_csv(connectivity_file)
     # filter the df to keep only the rows where idx-region_pre contains source_region
     df_connectivity_pathways = df_connectivity_pathways[
         df_connectivity_pathways["idx-region_pre"].str.contains(source_region)
@@ -246,8 +247,8 @@ def load_clustering_conn(
     "axonal-projection/axon_projection/out_ML_7",
 ):
     """Load the connection probabilities from the clustered axons."""
-    clustering_output_df = pandas.read_csv(clustering_dir + "/clustering_output.csv", index_col=0)
-    conn_probs_df = pandas.read_csv(clustering_dir + "/conn_probs.csv")  # , index_col=0)
+    clustering_output_df = pd.read_csv(clustering_dir + "/clustering_output.csv", index_col=0)
+    conn_probs_df = pd.read_csv(clustering_dir + "/conn_probs.csv")  # , index_col=0)
 
     cluster_probs = clustering_output_df[clustering_output_df["source"] == source_region][
         "probability"
@@ -356,67 +357,139 @@ def plot_out_degree(
     conn_mat_path, conn_mat_wo_axons_path, conn_mat_bio=None, region_to_plot="MOp5", out_dir="."
 ):
     """Plot the out degree distribution of the two matrices."""
+    # num_conns_flat_with_axons = compute_out_degree(
+    #     conn_mat_path, region_to_plot, is_bio=False, with_axons=True
+    # )
+    # print(num_conns_flat_with_axons)
+    # num_conns_flat_wo_axons = compute_out_degree(
+    #     conn_mat_wo_axons_path, region_to_plot, is_bio=False
+    # )
+    # # plot the distribution of number of connections
+    # fig, ax = plt.subplots(figsize=(5, 5))
+    # sns.histplot(
+    #     num_conns_flat_with_axons, kde=True, color="tab:red", ax=ax, stat="percent"
+    # )
+    # cmp_color = "tab:green"
+    # sns.histplot(num_conns_flat_wo_axons, kde=True, color=cmp_color, ax=ax, stat="percent")
+
+    # if conn_mat_bio is not None:
+    #     num_conns_bio = compute_out_degree(
+    #         conn_mat_bio, region_to_plot, is_bio=True, with_axons=True
+    #     )
+    #     sns.histplot(num_conns_bio, kde=True, color="tab:blue", ax=ax, stat="percent")
+    # ax.spines["top"].set_visible(False)
+    # ax.spines["right"].set_visible(False)
+    # ax.set_xlabel("Number of connections")
+    # ax.set_ylabel("Percentage of neurons")
+    # # set the title
+    # ax.set_title("Distribution of out-degree")
+    # set_font_size()
+    # fig.savefig(out_dir + "/connection_distr.pdf")
+    # print("Saving distribution in ", out_dir + "/connection_distr.pdf")
+
+    # # plot also a normalized version to compare the distributions shape
+    # fig, ax = plt.subplots(figsize=(2, 2))
+    # sns.histplot(
+    #     num_conns_flat_with_axons / np.max(num_conns_flat_with_axons),
+    #     kde=True,
+    #     color="tab:red",
+    #     ax=ax,
+    #     stat="percent",
+    #     common_norm=False,
+    # )
+    # sns.histplot(
+    #     num_conns_flat_wo_axons / np.max(num_conns_flat_wo_axons),
+    #     kde=True,
+    #     color=cmp_color,
+    #     ax=ax,
+    #     stat="percent",
+    #     common_norm=False,
+    # )
+    # if conn_mat_bio is not None:
+    #     sns.histplot(
+    #         num_conns_bio / np.max(num_conns_bio),
+    #         kde=True,
+    #         color="tab:blue",
+    #         ax=ax,
+    #         stat="percent",
+    #         common_norm=False,
+    #     )
+    # Compute the number of connections
     num_conns_flat_with_axons = compute_out_degree(
         conn_mat_path, region_to_plot, is_bio=False, with_axons=True
     )
     num_conns_flat_wo_axons = compute_out_degree(
         conn_mat_wo_axons_path, region_to_plot, is_bio=False
     )
-    # plot the distribution of number of connections
-    fig, ax = plt.subplots(figsize=(5, 5))
-    sns.histplot(
-        num_conns_flat_with_axons, bins=100, kde=True, color="tab:red", ax=ax, stat="count"
-    )
-    cmp_color = "tab:green"
-    sns.histplot(num_conns_flat_wo_axons, bins=100, kde=True, color=cmp_color, ax=ax, stat="count")
+
+    # Prepare data for seaborn histplot with hue
+    data = {
+        "Connections": np.concatenate([num_conns_flat_with_axons, num_conns_flat_wo_axons]),
+        "Type": ["Synthesized LRAs"] * len(num_conns_flat_with_axons)
+        + ["Local axons"] * len(num_conns_flat_wo_axons),
+    }
 
     if conn_mat_bio is not None:
         num_conns_bio = compute_out_degree(
             conn_mat_bio, region_to_plot, is_bio=True, with_axons=True
         )
-        sns.histplot(num_conns_bio, bins=100, kde=True, color="tab:blue", ax=ax, stat="count")
+        data["Connections"] = np.concatenate([data["Connections"], num_conns_bio])
+        data["Type"] += ["Reconstructed LRAs"] * len(num_conns_bio)
+
+    # Define RGBA color for 'tab:blue' with alpha = 0.5
+    tab_blue_rgb = mcolors.to_rgb("tab:blue")
+    tab_green_rgb = mcolors.to_rgb("tab:green")
+    tab_red_rgb = mcolors.to_rgb("tab:red")
+    # Define the color palette
+    palette = {
+        "Reconstructed LRAs": tab_blue_rgb,
+        "Synthesized LRAs": tab_red_rgb,
+        "Local axons": tab_green_rgb,
+    }
+    # Plot distribution of number of connections
+    set_font_size()
+    fig, ax = plt.subplots(figsize=(5, 5))
+    sns.histplot(
+        data=pd.DataFrame(data),
+        x="Connections",
+        hue="Type",
+        kde=True,
+        common_norm=False,
+        stat="percent",
+        common_bins=True,
+        palette=palette,
+    )
+
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.set_xlabel("Number of connections")
-    ax.set_ylabel("Number of neurons")
-    # set the title
+    ax.set_ylabel("Percentage of neurons")
     ax.set_title("Distribution of out-degree")
-    set_font_size()
-    fig.savefig(out_dir + "/connection_distr.pdf")
-    print("Saving distribution in ", out_dir + "/connection_distr.pdf")
 
-    # plot also a normalized version to compare the distributions shape
+    fig.savefig(out_dir + "/connection_distr.pdf")
+    print(f"Saving distribution in {out_dir}/connection_distr.pdf")
+
+    # Plot normalized distribution
     fig, ax = plt.subplots(figsize=(2, 2))
     sns.histplot(
-        num_conns_flat_with_axons / np.max(num_conns_flat_with_axons),
-        bins=100,
-        kde=True,
-        color="tab:red",
-        ax=ax,
-        stat="density",
+        data=pd.DataFrame(data),
+        x="Connections",
+        hue="Type",
+        kde=False,
+        stat="percent",
+        multiple="layer",
+        common_norm=False,
+        common_bins=True,
+        cumulative=True,
+        palette=palette,
     )
-    sns.histplot(
-        num_conns_flat_wo_axons / np.max(num_conns_flat_wo_axons),
-        bins=100,
-        kde=True,
-        color=cmp_color,
-        ax=ax,
-        stat="density",
+    sns.ecdfplot(
+        data=pd.DataFrame(data), x="Connections", hue="Type", palette=palette, stat="percent"
     )
-    if conn_mat_bio is not None:
-        sns.histplot(
-            num_conns_bio / np.max(num_conns_bio),
-            bins=100,
-            kde=True,
-            color="tab:blue",
-            ax=ax,
-            stat="density",
-        )
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.set_xlabel("Normalized number of connections")
-    ax.set_ylabel("Density of neurons")
-    set_font_size(12)
+    ax.set_xlabel("Number of connections")
+    ax.set_ylabel("Percentage of neurons")
     fig.savefig(out_dir + "/connection_distr_norm.pdf")
 
 
@@ -505,12 +578,12 @@ if __name__ == "__main__":
         # }]
     }
 
-    M = create_conn_mat(circ_fn, loader_config)
-    save_conn_mat(M, out_dir + "/conn_mat_" + whichWorkflow.replace("_", ""))
+    # M = create_conn_mat(circ_fn, loader_config)
+    # save_conn_mat(M, out_dir + "/conn_mat_" + whichWorkflow.replace("_", ""))
 
-    # M = load_conn_mat(out_dir + "/conn_mat_" + whichWorkflow.replace("_", ""))
+    M = load_conn_mat(out_dir + "/conn_mat_" + whichWorkflow.replace("_", ""))
 
-    analyze_connectome(M, out_dir)
+    # analyze_connectome(M, out_dir)
     compare_lengths_vs_connectivity(
         clustering_dir_synth_ + "/axon_lengths_" + str(hierarchy_level) + ".csv",
         sim_dir + "/connection_counts_for_pathways.csv",
@@ -532,7 +605,7 @@ if __name__ == "__main__":
     )
 
     # chord diagram
-    bio_pathways_df = pandas.read_csv(
+    bio_pathways_df = pd.read_csv(
         clustering_dir_ + "/conn_probs.csv",
         index_col=0,
     )

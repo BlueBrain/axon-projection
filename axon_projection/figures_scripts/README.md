@@ -1,7 +1,5 @@
 # Figures
-Scripts used for generating the figures in the article Petkantchin et al.
-
-TODO add DOI
+Scripts used for generating the figures in the article Petkantchin et al. [Generating brain-wide connectome using synthetic axonal morphologies](https://doi.org/10.1101/2024.10.04.616605).
 
 ## Clustered vs. sampled presubiculum axons
 

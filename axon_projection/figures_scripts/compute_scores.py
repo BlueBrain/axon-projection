@@ -238,27 +238,27 @@ def plot_population_stats(
         #     palette=palette,
         #     log_scale=False,
         # )
-        # ax = sns.violinplot(
-        #     x="Morphometric",
-        #     y="Values",
-        #     hue="Type",
-        #     data=df_filtered,
-        #     split=True,
-        #     inner="quartile",
-        #     palette=palette,
-        #     log_scale=False,
-        # )
-        ax = sns.histplot(
-            x="Values",
+        ax = sns.violinplot(
+            x="Morphometric",
+            y="Values",
             hue="Type",
             data=df_filtered,
-            kde=True,
+            split=True,
+            inner="quartile",
             palette=palette,
             log_scale=False,
-            stat="percent",
-            common_norm=False,
-            bins=100,
         )
+        # ax = sns.histplot(
+        #     x="Values",
+        #     hue="Type",
+        #     data=df_filtered,
+        #     kde=True,
+        #     palette=palette,
+        #     log_scale=False,
+        #     stat="percent",
+        #     common_norm=False,
+        #     bins=100,
+        # )
     ax.set_xlabel(feat_name)
     x_labels = []
     for morph_feature in morphometrics:
@@ -455,20 +455,20 @@ if __name__ == "__main__":
             str(os.path.basename(m)).startswith(morph_name) for morph_name in list_morphs_to_keep
         )
     ]
-    # SYNTH pre-processed trunks paths
-    synth_main_trunks_paths = a_s_out_path + "MainTrunkMorphologies"
-    synth_main_trunks_morphs_list_pre = get_morphology_paths(synth_main_trunks_paths)[
-        "morph_path"
-    ].values.tolist()
-    synth_main_trunks_morphs_list = [
-        m
-        for m in synth_main_trunks_morphs_list_pre
-        if any(
-            str(os.path.basename(m)).startswith(morph_name) for morph_name in list_morphs_to_keep
-        )
-    ]
+    # # SYNTH pre-processed trunks paths
+    # synth_main_trunks_paths = a_s_out_path + "MainTrunkMorphologies"
+    # synth_main_trunks_morphs_list_pre = get_morphology_paths(synth_main_trunks_paths)[
+    #     "morph_path"
+    # ].values.tolist()
+    # synth_main_trunks_morphs_list = [
+    #     m
+    #     for m in synth_main_trunks_morphs_list_pre
+    #     if any(
+    #         str(os.path.basename(m)).startswith(morph_name) for morph_name in list_morphs_to_keep
+    #     )
+    # ]
 
-    data_file_name = "pop_morphometrics_MOp5"
+    data_file_name = "pop_morphometrics_final_MOp5"
 
     compute_stats_populations(
         bio_tufts_morphs_list,
@@ -484,13 +484,13 @@ if __name__ == "__main__":
         morph_type="trunks",
         out_file=data_file_name,
     )
-    compute_stats_populations(
-        bio_trunks_morphs_list,
-        synth_main_trunks_morphs_list,
-        morphometrics,
-        morph_type="main_trunks",
-        out_file=data_file_name,
-    )
+    # compute_stats_populations(
+    #     bio_trunks_morphs_list,
+    #     synth_main_trunks_morphs_list,
+    #     morphometrics,
+    #     morph_type="main_trunks",
+    #     out_file=data_file_name,
+    # )
 
     make_plots_score(
         bio_tufts_morphs_list,
@@ -506,10 +506,10 @@ if __name__ == "__main__":
         morph_type="trunks",
         data_file_name=data_file_name,
     )
-    make_plots_score(
-        bio_trunks_morphs_list,
-        synth_main_trunks_morphs_list,
-        morphometrics,
-        morph_type="main_trunks",
-        data_file_name=data_file_name,
-    )
+    # make_plots_score(
+    #     bio_trunks_morphs_list,
+    #     synth_main_trunks_morphs_list,
+    #     morphometrics,
+    #     morph_type="main_trunks",
+    #     data_file_name=data_file_name,
+    # )

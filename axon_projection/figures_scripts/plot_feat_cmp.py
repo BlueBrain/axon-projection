@@ -32,13 +32,13 @@ if __name__ == "__main__":
     R_synth_target = int(L_synth * R_bio / L_bio)
     dict_morphs_to_keep = {"R": R_synth_target}
 
-    # micro-scale
+    # meso-scale
     regions_subset = ["MOp1", "MOp2", "MOp3", "MOp5", "MOp6a", "MOp6b"]
     compare_feat_in_regions(
         lengths_bio_path,
         lengths_synth_path,
         "lengths",
-        out_path=path_synth + "/micro_scale/",
+        out_path=path_synth + "/meso_scale/",
         regions_subset=regions_subset,
         dict_filter_morphs=dict_morphs_to_keep,
     )
@@ -46,7 +46,7 @@ if __name__ == "__main__":
         terms_bio_path,
         terms_synth_path,
         "terminals",
-        out_path=path_synth + "/micro_scale/",
+        out_path=path_synth + "/meso_scale/",
         regions_subset=regions_subset,
         dict_filter_morphs=dict_morphs_to_keep,
     )

@@ -419,8 +419,10 @@ if __name__ == "__main__":
 
     # build the parent mapping
     with open(
-        "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/"
-        "atlas_aleksandra/atlas-release-mouse-barrels-density-mod/hierarchy.json",
+        (
+            "/gpfs/bbp.cscs.ch/data/project/proj135/home/petkantc/atlas/"
+            "atlas_aleksandra/atlas-release-mouse-barrels-density-mod/hierarchy.json"
+        ),
         encoding="utf-8",
     ) as f:
         hierarchy_data = json.load(f)
@@ -456,8 +458,10 @@ if __name__ == "__main__":
         reintroduce_axons(filtered_collection_path, all_morphs_path)
     elif which_task == "rc":
         revert_collection_to_original(
-            "/gpfs/bbp.cscs.ch/project/proj82/home/petkantc/axon/axonal-projection/"
-            "axon_projection/validation/circuit-build/lite/cells_collection_MOp.h5",
+            (
+                "/gpfs/bbp.cscs.ch/project/proj82/home/petkantc/axon/axonal-projection/"
+                "axon_projection/validation/circuit-build/lite/cells_collection_MOp.h5"
+            ),
             axon_morphs_path,
             save_collection=True,
         )
