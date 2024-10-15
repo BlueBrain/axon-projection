@@ -78,7 +78,10 @@ The output is generated in the [example/out_example](example/out_example) folder
 
 ## Citation
 
-TODO put DOI
+To cite this repository, please cite the accompanying research article:
+
+Petkantchin, R., Berchet, A., Peng, H., Markram, H., Kanari, L., 2024. Generating brain-wide connectome using synthetic axonal morphologies. https://doi.org/10.1101/2024.10.04.616605
+
 
 ## Acknowledgements
 This work was supported by funding to the Blue Brain Project, a research center of the École polytechnique fédérale de Lausanne (EPFL), from the Swiss government's ETH Board of the Swiss Federal Institutes of Technology.
