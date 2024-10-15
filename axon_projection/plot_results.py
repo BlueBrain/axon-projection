@@ -471,7 +471,7 @@ def set_font_size(font_size=18):
     plt.rc("figure", titlesize=font_size + 3)
 
 
-# pylint: disable=too-many-statements, dangerous-default-value, too-many-local
+# pylint: disable=too-many-statements, dangerous-default-value, too-many-locals
 # pylint: disable=too-many-positional-arguments
 def compare_feat_in_regions(
     df_bio_path,
