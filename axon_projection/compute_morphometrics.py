@@ -13,7 +13,8 @@ import neurom as nm
 import numpy as np
 import pandas as pd
 from neurom import NeuriteType
-from synthesis_workflow.validation import mvs_score
+
+from axon_projection.plot_utils import mvs_score
 
 
 def get_axons(morph):

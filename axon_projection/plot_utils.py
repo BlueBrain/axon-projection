@@ -2,6 +2,7 @@
 import logging
 from pathlib import Path
 
+import numpy as np
 import plotly.graph_objects as go
 from axon_synthesis.utils import add_camera_sync
 from neurom import load_morphology
@@ -211,3 +212,34 @@ def plot_trunk(morph, trunk_morph, group, group_name, output_path):
 
     # add_camera_sync(str(output_path))
     # logging.debug("Exported figure to %s", output_path)
+
+
+def mvs_score(data1, data2, percentile=10):
+    """Get the MED - MVS score.
+
+    The MED - MVS is equal to the absolute difference between the median of the
+    population and the median of the neuron divided by the maximum visible spread.
+
+    Args:
+        data1 (list): the first data set.
+        data2 (list): the second data set.
+        percentile (int): percentile to compute.
+    """
+    median_diff = np.abs(np.median(data1) - np.median(data2))
+    max_percentile = np.max(
+        [
+            np.percentile(data1, 100 - percentile / 2.0, axis=0),
+            np.percentile(data2, 100 - percentile / 2.0, axis=0),
+        ]
+    )
+
+    min_percentile = np.min(
+        [
+            np.percentile(data1, percentile / 2.0, axis=0),
+            np.percentile(data2, percentile / 2.0, axis=0),
+        ]
+    )
+
+    max_vis_spread = max_percentile - min_percentile
+
+    return median_diff / max_vis_spread

@@ -19,12 +19,12 @@ from pycirclize import Circos
 from pycirclize.parser import Matrix
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
-from synthesis_workflow.validation import mvs_score
 
 from axon_projection.choose_hierarchy_level import build_parent_mapping
 from axon_projection.choose_hierarchy_level import find_acronym
 from axon_projection.choose_hierarchy_level import find_atlas_id
 from axon_projection.choose_hierarchy_level import find_parent_acronym
+from axon_projection.plot_utils import mvs_score
 from axon_projection.query_atlas import without_hemisphere
 
 # pylint: disable=too-many-lines
