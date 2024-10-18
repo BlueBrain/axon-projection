@@ -64,17 +64,34 @@ The output of this step, is the creation of clusters for each source region, def
 <!-- Appropriate tufts are then selected, based on this number of terminals and the tufts' representativity score. The output is a tuft tuple, which, among others, contains the tuft topological barcode, which can be used for topological synthesis. -->
 
 ## Examples
+The example folder contains some files to run an example usage of the code.
 
-The [example](example) folder contains some files to run an example of the code.
+### Clustering of axons
+First, brain atlas files (`brain_atlas.zip`) need to be downloaded from https://doi.org/10.5281/zenodo.13790069 and uncompressed (for instance with `unzip brain_atlas.zip`) in the example/data folder.
 
-The [example/config_example.cfg](example/config_example.cfg) configuration file provides the parameters for each step of the workflow. The workflow can be run by executing the script [example/run_example.sh](example/run_example.sh), which basically places the user in the modules directory, and runs the complete workflow:
+The example/config_clustering_example.cfg configuration file provides the parameters for each step of the workflow. The workflow can be run by executing the script example/run_clustering_example.sh (with the venv activated, source venvAP/bin/activate), which basically runs the complete workflow:
+
 ```bash
-cd ../axon_projection
-python run.py ../example/config_example.cfg
+python ../axon_projection/run.py config_clustering_example.cfg
 ```
 
-The output is generated in the [example/out_example](example/out_example) folder.
+The example should run in a few minutes, depending on the computing configuration (4 minutes with 20 processes). The output is generated in the example/out_clustering_example folder.
 
+### Axon synthesis example
+This second example shows how to use the output of the projections clustering from the previous example, as input for the axon synthesis algorithm presented in https://doi.org/10.1101/2024.10.16.618695. Namely, the target locations of the axons, number and selection of tufts is provided by the projection clustering code.
+
+To run the synthesis example, ensure to first run the clustering example.
+
+Then, simply run the run_synthesis_example.sh script with the virtual environment activated. The [example/config_synthesis_example.cfg](example/config_synthesis_example.cfg) configuration file contains the parameters used in the axon synthesis algorithm.
+
+This example synthesizes axons for the set of axon-less morphologies in the folder [example/data/morphologies_for_synthesis](example/data/morphologies_for_synthesis), using the data extracted from axons in the folder [example/data/morphologies](example/data/morphologies).
+
+This example has an initial computation of brain regions masks that takes around 15-20 minutes (and creates the output `boundary.nrrd` in the data directory), and the synthesis runs typically in 5 minutes, without leveraging parallelism.
+
+To use parallelism, one can install the axon-synthesis package with the mpi option
+```bash
+pip install axon-synthesis[mpi]
+```
 
 ## Citation
 
