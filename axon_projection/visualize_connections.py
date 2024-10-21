@@ -1,3 +1,13 @@
+# LICENSE HEADER MANAGED BY add-license-header
+#
+# Copyright (c) 2023-2024 Blue Brain Project, EPFL.
+#
+# This file is part of AxonProjection.
+# See https://github.com/BlueBrain/AxonProjection for further info.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
 """Create graphs to visualize the projections of each ap-class."""
 
 import configparser
@@ -174,9 +184,9 @@ def create_conn_graphs(config, verify=False):
                             inter_nodes[n + 1],
                             weight=min_prob + 0.001 + row["probability"],
                         )
-                        edge_labels[
-                            inter_nodes[n], inter_nodes[n + 1]
-                        ] = f"{100 * row['probability']:.2f}"
+                        edge_labels[inter_nodes[n], inter_nodes[n + 1]] = (
+                            f"{100 * row['probability']:.2f}"
+                        )
                         # edge_weights.append(min_prob+0.001+2.*row['probability'])
                     else:
                         G.add_edge(inter_nodes[n], inter_nodes[n + 1], weight=min_prob + 0.001)

@@ -1,4 +1,15 @@
+# LICENSE HEADER MANAGED BY add-license-header
+#
+# Copyright (c) 2023-2024 Blue Brain Project, EPFL.
+#
+# This file is part of AxonProjection.
+# See https://github.com/BlueBrain/AxonProjection for further info.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
 """Handy module to convert acronyms to their full names, and output to tex table."""
+
 import ast
 
 import pandas as pd

@@ -1,3 +1,13 @@
+# LICENSE HEADER MANAGED BY add-license-header
+#
+# Copyright (c) 2023-2024 Blue Brain Project, EPFL.
+#
+# This file is part of AxonProjection.
+# See https://github.com/BlueBrain/AxonProjection for further info.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
 """Spack module for the axon-projection distribution."""
 
 # Copyright 2013-2018 Lawrence Livermore National Security, LLC and other
@@ -12,11 +22,11 @@ from spack import *
 class Py_axon_projection(PythonPackage):
     """A code that analyses long-range axons provided as input, and classify them based on the brain regions they project to."""
 
-    homepage = "https://bbpteam.epfl.ch/documentation/projects/axon-projection"
-    git = "https://bbpgitlab.epfl.ch/neuromath/petkantc/axon-projection"
+    homepage = "https://AxonProjection.readthedocs.io"
+    git = "https://github.com/BlueBrain/AxonProjection"
 
     version("develop", branch="master")
-    version("0.1.0.dev0", tag="axon-projection-v0.1.0.dev0")
+    version("0.1.0.dev0", tag="0.1.0.dev0")
 
     depends_on("py-setuptools", type="build")
     # type=("build", "run") if specifying entry points in "setup.py"

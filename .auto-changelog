@@ -1,12 +1,11 @@
 {
     "output": "CHANGELOG.md",
     "template": ".auto-changelog-template.hbs",
-    "tagPrefix": "axon-projection-v",
     "commitLimit": false,
     "backfillLimit": false,
-    "ignoreCommitPattern": "^Release:? [0-9]+\\.[0-9]+\\.[0-9]+$|^Update CHANGELOG.*|.*\\[skip-changelog\\].*|^\\[pre-commit.ci\\]|^\\(dependabot\\) .*",
-    "commitUrl": "https://bbpgitlab.epfl.ch/neuromath/petkantc/axon-projection/commit/{id}",
-    "issueUrl": "https://bbpgitlab.epfl.ch/neuromath/petkantc/axon-projection/issues/{id}",
-    "mergeUrl": "https://bbpgitlab.epfl.ch/neuromath/petkantc/axon-projection/merge_requests/{id}",
-    "compareUrl": "https://bbpgitlab.epfl.ch/neuromath/petkantc/axon-projection/compare/{from}...{to}"
+    "ignoreCommitPattern": "^Release:? [0-9]+\\.[0-9]+\\.[0-9]+( ?\\(#[0-9]+\\))?$|^Update CHANGELOG.*|.*\\[skip-changelog\\].*|^\\[pre-commit.ci\\]|^\\(dependabot\\) .*",
+    "commitUrl": "https://github.com/BlueBrain/axon-projection/commit/{id}",
+    "issueUrl": "https://github.com/BlueBrain/axon-projection/issues/{id}",
+    "mergeUrl": "https://github.com/BlueBrain/axon-projection/pull/{id}",
+    "compareUrl": "https://github.com/BlueBrain/axon-projection/compare/{from}..{to}"
 }

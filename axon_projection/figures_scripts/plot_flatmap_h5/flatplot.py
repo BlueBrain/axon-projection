@@ -1,4 +1,15 @@
+# LICENSE HEADER MANAGED BY add-license-header
+#
+# Copyright (c) 2023-2024 Blue Brain Project, EPFL.
+#
+# This file is part of AxonProjection.
+# See https://github.com/BlueBrain/AxonProjection for further info.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
 """Module to plot flatmap with datashader."""
+
 # !/usr/bin/env python3
 # AUTHOR: Sirio Bolaños Puchet <sirio.bolanospuchet@epfl.ch>
 # CREATION DATE: 2023-05-30

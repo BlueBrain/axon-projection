@@ -1,25 +1,25 @@
 # Changes here will be overwritten by Copier
 
-_commit: 0.1.52
-_src_path: git@bbpgitlab.epfl.ch:neuromath/python-template.git
-author_email: cells@groupes.epfl.ch
-author_name: cells
-copyright_license: BBP-internal-confidential
+_commit: 0.1.63
+_src_path: /gpfs/bbp.cscs.ch/project/proj135/home/petkantc/python-template
+author_name: Blue Brain Project, EPFL
+copyright_license: Apache License 2.0
 copyright_year: '2023'
 distribution_name: axon-projection
-download_url: https://bbpgitlab.epfl.ch/neuromath/petkantc/axon-projection
+download_url: https://github.com/BlueBrain/AxonProjection
 init_git: true
+maintainer: Rémy Petkantchin (@Remy2506)
 package_name: axon_projection
 project_description: A code that analyses long-range axons provided as input, and
     classify them based on the brain regions they project to.
 project_name: Axon Projection
-project_url: https://bbpteam.epfl.ch/documentation/projects/axon-projection
+project_url: https://AxonProjection.readthedocs.io
 repository_name: axon-projection
-repository_namespace: neuromath/petkantc
-repository_provider: gitlab
-ssh_url: git@bbpgitlab.epfl.ch:neuromath/petkantc/axon-projection.git
-team_name: neuromath
-tracker_url: https://bbpteam.epfl.ch/project/issues/projects/CELLS/issues
+repository_namespace: BlueBrain
+repository_provider: github
+setup_codeql: false
+ssh_url: git@github.com:BlueBrain/AxonProjection.git
+tracker_url: https://github.com/BlueBrain/AxonProjection/issues
 use_pyproject_toml: false
 version: 0.1.0.dev0
 

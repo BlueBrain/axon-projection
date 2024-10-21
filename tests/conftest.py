@@ -1,26 +1,11 @@
+# LICENSE HEADER MANAGED BY add-license-header
+#
+# Copyright (c) 2023-2024 Blue Brain Project, EPFL.
+#
+# This file is part of AxonProjection.
+# See https://github.com/BlueBrain/AxonProjection for further info.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
 """Configuration for the pytest test suite."""
-# import os
-from pathlib import Path
-
-import pytest
-
-from . import DATA
-
-
-@pytest.fixture
-def data_dir():
-    """The data directory."""
-    return DATA
-
-
-@pytest.fixture
-def testing_dir(tmpdir, monkeypatch):
-    """The testing directory."""
-    monkeypatch.chdir(tmpdir)
-    return Path(tmpdir)
-
-
-@pytest.fixture
-def hierarchy_file_path(data_dir):  # pylint: disable=redefined-outer-name
-    """Returns path to the hierarchy file from the testing framework."""
-    return data_dir / "mba_hierarchy.json"

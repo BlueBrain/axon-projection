@@ -1,4 +1,15 @@
+# LICENSE HEADER MANAGED BY add-license-header
+#
+# Copyright (c) 2023-2024 Blue Brain Project, EPFL.
+#
+# This file is part of AxonProjection.
+# See https://github.com/BlueBrain/AxonProjection for further info.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
 """Runs the workflow of extracting axonal projections of given morphologies and classifying them."""
+
 import configparser
 import logging
 import sys
