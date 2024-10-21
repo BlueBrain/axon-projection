@@ -15,7 +15,22 @@ from pathlib import Path
 from setuptools import find_namespace_packages
 from setuptools import setup
 
-reqs = ["click>=7"]
+reqs = [
+    "click>=7",
+    "matplotlib",
+    "networkx>=3.1",
+    "neurom @ git+https://github.com/BlueBrain/NeuroM.git@a44ecc4c30d8d5e52fbb95d5cdf43394d1284d53",
+    "nexusforge>=0.8.1",
+    "numpy",
+    "pandas>=1.5.3",
+    "scikit-learn>=1.3.0",
+    "voxcell>=3.1.5",
+    "plotly>=5.17.0",
+    "plotly-helper>=0.0.8",
+    "axon-synthesis",
+    "tabulate",
+    "pycirclize",
+]
 
 doc_reqs = [
     "docutils<0.21",
