@@ -2,9 +2,9 @@
 
 <!-- This file should be auto-generated using the auto-changelog command (https://www.npmjs.com/package/auto-changelog) -->
 
-## axon-projection-v0.1.0.dev0
+## 0.1.0.dev0
 
-> 28 November 2023
+> 18 October 2024
 
 ### New Features
 

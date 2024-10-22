@@ -1,4 +1,15 @@
+# LICENSE HEADER MANAGED BY add-license-header
+#
+# Copyright (c) 2023-2024 Blue Brain Project, EPFL.
+#
+# This file is part of axon-projection.
+# See https://github.com/BlueBrain/axon-projection for further info.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
 """Functions to plot the results of the classification."""
+
 import ast
 import configparser
 import json
@@ -1464,9 +1475,9 @@ def plot_hemispheres(
         lambda x: find_parent_acronym(x, parent_mapping, regions_subset)
     )
     print(nb_target_pts_synth_df[nb_target_pts_synth_df["parent_region"].isna()])
-    nb_target_pts_synth_df.loc[
-        nb_target_pts_synth_df["parent_region"].isna(), "parent_region"
-    ] = "Other"
+    nb_target_pts_synth_df.loc[nb_target_pts_synth_df["parent_region"].isna(), "parent_region"] = (
+        "Other"
+    )
     # nb_target_pts_synth_df = nb_target_pts_synth_df.dropna(subset=["parent_region"])
     nb_target_pts_synth_df["source_hemisphere"] = (
         nb_target_pts_synth_df["target_population_id"].str.split("_").str[1]
@@ -1509,10 +1520,12 @@ def plot_hemispheres(
         for s, source_hemisphere in enumerate(source_hemispheres):
             subset = grouped[grouped["source_hemisphere"] == source_hemisphere]
             explode = [
-                0.2
-                if (target == "L" and source_hemisphere == "R")
-                or (target == "R" and source_hemisphere == "L")
-                else 0.0
+                (
+                    0.2
+                    if (target == "L" and source_hemisphere == "R")
+                    or (target == "R" and source_hemisphere == "L")
+                    else 0.0
+                )
                 for target in subset["target_hemisphere"]
             ]
 

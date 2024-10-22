@@ -1,17 +1,19 @@
+# LICENSE HEADER MANAGED BY add-license-header
+#
+# Copyright (c) 2023-2024 Blue Brain Project, EPFL.
+#
+# This file is part of axon-projection.
+# See https://github.com/BlueBrain/axon-projection for further info.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
 """Setup for the axon-projection package."""
-import importlib.util
+
 from pathlib import Path
 
 from setuptools import find_namespace_packages
 from setuptools import setup
-
-spec = importlib.util.spec_from_file_location(
-    "axon_projection.version",
-    "axon_projection/version.py",
-)
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
-VERSION = module.VERSION
 
 reqs = [
     "click>=7",
@@ -25,7 +27,7 @@ reqs = [
     "voxcell>=3.1.5",
     "plotly>=5.17.0",
     "plotly-helper>=0.0.8",
-    "axon-synthesis>=0.1.0.dev0",
+    "axon-synthesis",
     "tabulate",
     "pycirclize",
 ]
@@ -40,30 +42,31 @@ doc_reqs = [
 
 test_reqs = [
     "mock>=3",
-    "pytest>=6",
-    "pytest-click>=1",
-    "pytest-console-scripts>=1.3",
-    "pytest-cov>=3",
-    "pytest-html>=2",
+    "pytest>=6.1",
+    "pytest-click>=1.1",
+    "pytest-console-scripts>=1.4",
+    "pytest-cov>=4.1",
+    "pytest-html>=3.2",
 ]
 
 setup(
     name="axon-projection",
-    author="cells",
-    author_email="cells@groupes.epfl.ch",
-    description="A code that analyses long-range axons provided as input, "
-    + "and classify them based on the brain regions they project to.",
+    author="Blue Brain Project, EPFL",
+    description="A code that analyses long-range axons provided as input, and classify them based on the brain regions they project to.",
     long_description=Path("README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
-    url="https://bbpteam.epfl.ch/documentation/projects/axon-projection",
+    url="https://axon-projection.readthedocs.io",
     project_urls={
-        "Tracker": "https://bbpteam.epfl.ch/project/issues/projects/CELLS/issues",
-        "Source": "https://bbpgitlab.epfl.ch/neuromath/petkantc/axon-projection",
+        "Tracker": "https://github.com/BlueBrain/axon-projection/issues",
+        "Source": "https://github.com/BlueBrain/axon-projection",
     },
-    license="BBP-internal-confidential",
+    license="Apache License 2.0",
     packages=find_namespace_packages(include=["axon_projection*"]),
-    python_requires=">=3.10",
-    version=VERSION,
+    python_requires=">=3.9",
+    use_scm_version=True,
+    setup_requires=[
+        "setuptools_scm",
+    ],
     install_requires=reqs,
     extras_require={
         "docs": doc_reqs,
@@ -82,8 +85,10 @@ setup(
         "Intended Audience :: Science/Research",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
 )

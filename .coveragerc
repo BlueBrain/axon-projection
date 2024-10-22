@@ -1,0 +1,6 @@
+[paths]
+source_paths =
+	axon_projection
+	*/site-packages/axon_projection
+	*/axon_projection/axon_projection
+	*/axon-projection/axon_projection

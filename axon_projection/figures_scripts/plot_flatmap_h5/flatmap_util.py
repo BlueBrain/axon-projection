@@ -1,4 +1,15 @@
+# LICENSE HEADER MANAGED BY add-license-header
+#
+# Copyright (c) 2023-2024 Blue Brain Project, EPFL.
+#
+# This file is part of axon-projection.
+# See https://github.com/BlueBrain/axon-projection for further info.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
 """Module with utility functions for flatmap plotting."""
+
 import numpy as np
 
 
@@ -78,9 +89,9 @@ def get_preimage_mask_vox(vox):
     wmin = [np.min(avox[:, 0]), np.min(avox[:, 1]), np.min(avox[:, 2])]
     wmax = [np.max(avox[:, 0]), np.max(avox[:, 1]), np.max(avox[:, 2])]
     lmsk = np.zeros((wmax[0] - wmin[0] + 1, wmax[1] - wmin[1] + 1, wmax[2] - wmin[2] + 1))
-    lmsk[
-        tuple([avox[:, 0] - wmin[0], avox[:, 1] - wmin[1], avox[:, 2] - wmin[2]])
-    ] = 1  # NOTE: must be 1
+    lmsk[tuple([avox[:, 0] - wmin[0], avox[:, 1] - wmin[1], avox[:, 2] - wmin[2]])] = (
+        1  # NOTE: must be 1
+    )
 
     return lmsk, nvox
 

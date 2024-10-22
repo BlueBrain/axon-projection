@@ -1,6 +1,7 @@
 # Axon Projection
-A code that analyses (long-range) axons provided as input, and clusters them based on the brain regions they project to. Once the clustering is done, the user can randomly sample an axon from a desired source brain region. The output of the sampling is a cluster assignment, and a number of terminals or axonal length for each target region.
-<!-- , and a set of selected tufts that go well with this choice. -->
+
+A code that analyses long-range axons provided as input, and classify them based on the brain regions they project to.
+
 
 ## Installation
 
@@ -12,12 +13,7 @@ source venvAP/bin/activate
 
 Clone this repository:
 ```bash
-git clone https://bbpgitlab.epfl.ch/neuromath/user/petkantc/axon-projection.git
-```
-
-And then install the package by running at the `setup.py` location:
-```bash
-pip install --index-url https://bbpteam.epfl.ch/repository/devpi/simple -e .
+git clone https://github.com/BlueBrain/axon-projection.git
 ```
 
 ## Running
@@ -29,7 +25,6 @@ or
 ```bash
 axon-projection -c <config_file>
 ```
-
 ## Workflow
 
 The workflow can either be run entirely, from clustering to the sampling, by running the `run.py` script. Each step can also be run separately, by running modules individually.
@@ -62,6 +57,7 @@ The output of this step, is the creation of clusters for each source region, def
 - **separate_tufts.py**: clusters and saves the tufts of each morphology by region, with their topological barcodes. Also computes how each tuft is representative of its group, defined by GMM cluster and target region, by comparing the difference of the tuft with all the others tufts of its group, based on a set of morphometrics (defined in the configuration file). This representativity score ranges from 0 (not representative) to 1 (representative). Finally, this step also computes *trunk_morphometric* morphometrics on the trunks of these morphologies (data needed for axon-synthesis).
 - **sample_axon.py**: uses the previously defined GMMs to sample an axon from a specified source region. This draws a cluster assignment, and a number of terminals or axon length in each target region.
 <!-- Appropriate tufts are then selected, based on this number of terminals and the tufts' representativity score. The output is a tuft tuple, which, among others, contains the tuft topological barcode, which can be used for topological synthesis. -->
+
 
 ## Examples
 The example folder contains some files to run an example usage of the code.
@@ -100,5 +96,12 @@ To cite this repository, please cite the accompanying research article:
 Petkantchin, R., Berchet, A., Peng, H., Markram, H., Kanari, L., 2024. Generating brain-wide connectome using synthetic axonal morphologies. https://doi.org/10.1101/2024.10.04.616605
 
 
-## Acknowledgements
-This work was supported by funding to the Blue Brain Project, a research center of the École polytechnique fédérale de Lausanne (EPFL), from the Swiss government's ETH Board of the Swiss Federal Institutes of Technology.
+## Funding & Acknowledgment
+
+The development of this software was supported by funding to the Blue Brain Project, a research
+center of the École polytechnique fédérale de Lausanne (EPFL), from the Swiss government’s ETH
+Board of the Swiss Federal Institutes of Technology.
+
+For license and authors, see `LICENSE.txt` and `AUTHORS.md` respectively.
+
+Copyright © 2023-2024 Blue Brain Project/EPFL

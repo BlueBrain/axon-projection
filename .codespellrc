@@ -1,3 +1,2 @@
 [codespell]
-skip = .git/*,*.json,*.tsv,*.csv,*.xml,*results.py,*acronyms_to_names.py,*build_connectome.py
-ignore-regex = @groupes.epfl.ch
+skip = .git/*
