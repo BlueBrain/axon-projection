@@ -13,7 +13,7 @@ source venvAP/bin/activate
 
 Clone this repository:
 ```bash
-git clone https://github.com/BlueBrain/AxonProjection.git
+git clone https://github.com/BlueBrain/axon-projection.git
 ```
 
 ## Running

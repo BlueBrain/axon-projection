@@ -6,20 +6,20 @@ author_name: Blue Brain Project, EPFL
 copyright_license: Apache License 2.0
 copyright_year: '2023'
 distribution_name: axon-projection
-download_url: https://github.com/BlueBrain/AxonProjection
+download_url: https://github.com/BlueBrain/axon-projection
 init_git: true
 maintainer: Rémy Petkantchin (@Remy2506)
 package_name: axon_projection
 project_description: A code that analyses long-range axons provided as input, and
     classify them based on the brain regions they project to.
 project_name: Axon Projection
-project_url: https://AxonProjection.readthedocs.io
+project_url: https://axon-projection.readthedocs.io
 repository_name: axon-projection
 repository_namespace: BlueBrain
 repository_provider: github
 setup_codeql: false
-ssh_url: git@github.com:BlueBrain/AxonProjection.git
-tracker_url: https://github.com/BlueBrain/AxonProjection/issues
+ssh_url: git@github.com:BlueBrain/axon-projection.git
+tracker_url: https://github.com/BlueBrain/axon-projection/issues
 use_pyproject_toml: false
 version: 0.1.0.dev0
 

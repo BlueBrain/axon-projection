@@ -2,8 +2,8 @@
 #
 # Copyright (c) 2023-2024 Blue Brain Project, EPFL.
 #
-# This file is part of AxonProjection.
-# See https://github.com/BlueBrain/AxonProjection for further info.
+# This file is part of axon-projection.
+# See https://github.com/BlueBrain/axon-projection for further info.
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -55,10 +55,10 @@ setup(
     description="A code that analyses long-range axons provided as input, and classify them based on the brain regions they project to.",
     long_description=Path("README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
-    url="https://AxonProjection.readthedocs.io",
+    url="https://axon-projection.readthedocs.io",
     project_urls={
-        "Tracker": "https://github.com/BlueBrain/AxonProjection/issues",
-        "Source": "https://github.com/BlueBrain/AxonProjection",
+        "Tracker": "https://github.com/BlueBrain/axon-projection/issues",
+        "Source": "https://github.com/BlueBrain/axon-projection",
     },
     license="Apache License 2.0",
     packages=find_namespace_packages(include=["axon_projection*"]),

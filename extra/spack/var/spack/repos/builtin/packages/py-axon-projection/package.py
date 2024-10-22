@@ -2,8 +2,8 @@
 #
 # Copyright (c) 2023-2024 Blue Brain Project, EPFL.
 #
-# This file is part of AxonProjection.
-# See https://github.com/BlueBrain/AxonProjection for further info.
+# This file is part of axon-projection.
+# See https://github.com/BlueBrain/axon-projection for further info.
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -22,8 +22,8 @@ from spack import *
 class Py_axon_projection(PythonPackage):
     """A code that analyses long-range axons provided as input, and classify them based on the brain regions they project to."""
 
-    homepage = "https://AxonProjection.readthedocs.io"
-    git = "https://github.com/BlueBrain/AxonProjection"
+    homepage = "https://axon-projection.readthedocs.io"
+    git = "https://github.com/BlueBrain/axon-projection"
 
     version("develop", branch="master")
     version("0.1.0.dev0", tag="0.1.0.dev0")
