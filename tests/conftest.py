@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from . import DATA
 @pytest.fixture
-def data_dir():
+def data_directory():
     """The data directory."""
     return DATA
 @pytest.fixture
