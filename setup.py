@@ -16,7 +16,7 @@ from setuptools import find_namespace_packages
 from setuptools import setup
 
 reqs = [
-    "axon-synthesis>=0.1.4",
+    "axon-synthesis>=0.1.5",
     "click>=7",
     "matplotlib>=3.9.0",
     "networkx>=3.1",
@@ -85,7 +85,6 @@ setup(
         "Intended Audience :: Science/Research",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
