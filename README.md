@@ -11,9 +11,11 @@ python -m venv venvAP
 source venvAP/bin/activate
 ```
 
-Clone this repository:
+Clone this repository and install the package:
 ```bash
 git clone https://github.com/BlueBrain/axon-projection.git
+cd axon-projection
+pip install .
 ```
 
 ## Running
