@@ -29,7 +29,7 @@ reqs = [
     "pycirclize>=1.6.0",
     "scikit-learn>=1.3.0",
     "tabulate>=0.9.0",
-    "voxcell>=3.1.5",
+    "voxcell>=3.1.9",
 ]
 
 doc_reqs = [
