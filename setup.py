@@ -17,13 +17,13 @@ from setuptools import setup
 
 reqs = [
     "axon-synthesis>=0.1.5",
-    "click>=7",
+    "click>=8",
     "matplotlib>=3.9.0",
     "networkx>=3.1",
     "neurom>=3.2.11",
     "nexusforge>=0.8.1",
     "numpy>=1.26.4",
-    "pandas>=1.5.3",
+    "pandas>=1.5",
     "plotly>=5.17.0",
     "plotly-helper>=0.0.8",
     "pycirclize>=1.6.0",
