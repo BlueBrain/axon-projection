@@ -1,6 +1,6 @@
 # Axon Projection
 
-A code that analyses long-range axons provided as input, and classify them based on the brain regions they project to.
+A code that analyses long-range axons provided as input, and classifies them based on the brain regions they project to.
 
 
 ## Installation
@@ -11,7 +11,12 @@ python -m venv venvAP
 source venvAP/bin/activate
 ```
 
-Clone this repository and install the package:
+The preferred way is to install directly from pypi:
+```bash
+pip install axon-projection
+```
+
+Otherwise, you can still clone this repository and install the package:
 ```bash
 git clone https://github.com/BlueBrain/axon-projection.git
 cd axon-projection
