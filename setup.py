@@ -28,7 +28,7 @@ reqs = [
     "plotly-helper>=0.0.8",
     "pycirclize>=1.6.0",
     "scikit-learn>=1.3.0",
-    "tabulate>=3.9.2",
+    "tabulate>=0.9.0",
     "voxcell>=3.1.5",
 ]
 
