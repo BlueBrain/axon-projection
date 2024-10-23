@@ -29,6 +29,7 @@ def testing_dir(tmpdir, monkeypatch):
     return Path(tmpdir)
 
 
+# pylint: disable=redefined-outer-name
 @pytest.fixture
 def hierarchy_file_path(data_directory):
     """Returns path to the hierarchy file from the testing framework."""
