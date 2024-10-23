@@ -52,7 +52,10 @@ test_reqs = [
 setup(
     name="axon-projection",
     author="Blue Brain Project, EPFL",
-    description="A code that analyses long-range axons provided as input, and classify them based on the brain regions they project to.",
+    description=(
+        "A code that analyses long-range axons provided as input, and "
+        "classify them based on the brain regions they project to."
+    ),
     long_description=Path("README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
     url="https://axon-projection.readthedocs.io",
