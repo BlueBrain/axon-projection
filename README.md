@@ -1,3 +1,7 @@
+# Warning
+
+The Blue Brain Project concluded in December 2024, so development has ceased under the BlueBrain GitHub organization. Future development will take place at: https://github.com/openbraininstitute/axon-projection
+
 # Axon Projection
 
 A code that analyses long-range axons provided as input, and classifies them based on the brain regions they project to.
